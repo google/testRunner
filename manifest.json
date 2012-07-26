@@ -1,0 +1,13 @@
+{
+  "name": "testRunner",
+  "version": "0.1",
+  "minimum_chrome_version": "22",
+  "description": "Run WebKit inspector LayoutTests with debugging. See options page for details.",
+   "devtools_page": "testRunnerDevtoolsPage.html",
+   "options_page": "options.html",
+  "permissions" :
+    [
+      "debugger",
+      "experimental"
+    ]
+}

@@ -1,0 +1,17 @@
+<html>
+<body>
+  <h1>Test Runner Extension</h1>
+
+  <p>Start the 
+    <a href="http://www.chromium.org/developers/testing/webkit-layout-tests#TOC-Tests-that-use-a-HTTP-Server">test server</a>
+     on port 9696, eg </p>
+  <pre>    cd src/third_party/WebKit/Tools/Scripts
+    ./new-run-webkit-httpd --server start --root=/work/sirius/extension/atopwi/LayoutTests/ --port 9696
+  </pre>
+  <p>Open the <a target="_blank" href="http://localhost:9696/">test client</a> and navigate to the test(s) you want to run. </p>
+  <p>Open devtools on the test tab and open devtools on devtools.</p>
+  <p>On the first devtools copy (the one to be tested) select the Test panel. </p>
+  <p>Click the Test button.</p>
+  <p>The code from the test page will be in the second devtools (the one debugging the tested devtools) at the bottom of the source named "testRunnerEvals.js"</p>
+</body>
+</html>
