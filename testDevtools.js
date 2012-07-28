@@ -4,8 +4,16 @@ console.log("testDevtools begins %o", chrome);
 
 var reloadedForTesting = false;
 
+function loadTestRunnerScript() {
+  var xhr = new XMLHttpRequest();
+  xhr.open("GET", "../testRunner.js", false);
+  xhr.send(null);
+  return  xhr.responseText;
+}
+
+var testRunnerScript = loadTestRunnerScript();
+
 function reloadForTesting() {
-  var testRunnerScript = document.querySelector("#testRunner").textContent;
   console.log("injectedScript: ", testRunnerScript);
   reloadedForTesting = true;
   var clearAll = "if (window.InspectorTest) window.InspectorTest.removeSniffers();\n"
