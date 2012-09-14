@@ -15,5 +15,12 @@
     [
       "*"
     ],
-     "content_security_policy": "script-src 'self' chrome-extension://fkhgelnmojgnpahkeemhnbjndeeocehc chrome-extension-resource: ; object-src 'self' "
+     "content_security_policy": "script-src 'self' chrome-extension://fkhgelnmojgnpahkeemhnbjndeeocehc chrome-extension-resource: ; object-src 'self' ",
+     "content_scripts": [
+        {
+          "matches": ["http://localhost:8002/LayoutTests/*"],
+          "css": ["testRunnerContentScript.css"],
+          "js": ["chrome-extension://ggimboaoffjaeoblofehalflljohnfbl/ChannelPlate/ChannelPlate.js", "testRunnerContentScript.js"]
+        }
+     ]
 }
