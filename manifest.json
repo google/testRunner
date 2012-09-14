@@ -9,8 +9,7 @@
    "options_page": "options.html",
   "permissions" :
     [
-      "debugger",
-      "experimental"
+      "debugger"
     ],
     "web_accessible_resources":
     [
