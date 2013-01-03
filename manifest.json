@@ -3,7 +3,7 @@
   "version": "0.1",
   "manifest_version": 2,
   "minimum_chrome_version": "22",
-  "description": "Run WebKit inspector LayoutTests with debugging. See options page for details.",
+  "description": "Run WebKit inspector LayoutTests in DevtoolsExtended with debugging. See options page for details.",
      "key": "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDQsrxFHxeLyBcjzyIwH2/6q3W4IWGDfErRo0EjpsvnLD1KH9hllwoA4COdug1FTUseVL1TYVexWZR+Ct+L9clqt96acholTgh5C+RQvrsr1enuyGoRkKSfEnLNmTG7ciDTZ9NGwADyZktGjezj0ras+T+NruYzA2NMrCXaSn3qdQIDAQAB",
    "devtools_page": "testRunnerDevtoolsPage.html",
    "options_page": "options.html",
@@ -15,12 +15,5 @@
     [
       "*"
     ],
-     "content_security_policy": "script-src 'self' chrome-extension://fkhgelnmojgnpahkeemhnbjndeeocehc chrome-extension-resource: ; object-src 'self' ",
-     "content_scripts": [
-        {
-          "matches": ["http://localhost:8002/LayoutTests/*"],
-          "css": ["testRunnerContentScript.css"],
-          "js": ["chrome-extension://ggimboaoffjaeoblofehalflljohnfbl/ChannelPlate/ChannelPlate.js", "testRunnerContentScript.js"]
-        }
-     ]
+     "content_security_policy": "script-src 'self' chrome-extension://fkhgelnmojgnpahkeemhnbjndeeocehc chrome-extension-resource: ; object-src 'self' "
 }

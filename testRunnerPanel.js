@@ -1,14 +1,13 @@
 // Google BSD license http://code.google.com/google_bsd_license.html
 // Copyright 2011 Google Inc. johnjbarton@google.com
 
-var testRunnerOrigin = "http://localhost:8002"; 
-var testRunnerPath = "/Source/WebCore/inspector/front-end/test-runner.html";
+var testRunnerOrigin = "chrome-extension://ggimboaoffjaeoblofehalflljohnfbl"; 
+var testRunnerPath = "/atopwi/test-runner.html";
 
 function createTestRunnerFrame() {
-  var iframe = document.createElement('iframe');
-  iframe.src = testRunnerOrigin + testRunnerPath;
-  iframe.classList.add("testRunner");
-  document.body.appendChild(iframe);
+  var url = testRunnerOrigin + testRunnerPath;
+  var features ="width=800,height=640";
+  window.open(url, 'test-runner', features);
   window.removeEventListener('load', createTestRunnerFrame);        
 }
 
