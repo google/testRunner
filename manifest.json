@@ -7,6 +7,9 @@
      "key": "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDQsrxFHxeLyBcjzyIwH2/6q3W4IWGDfErRo0EjpsvnLD1KH9hllwoA4COdug1FTUseVL1TYVexWZR+Ct+L9clqt96acholTgh5C+RQvrsr1enuyGoRkKSfEnLNmTG7ciDTZ9NGwADyZktGjezj0ras+T+NruYzA2NMrCXaSn3qdQIDAQAB",
    "devtools_page": "testRunnerDevtoolsPage.html",
    "options_page": "options.html",
+    "background": {
+      "scripts": ["ChannelPlate/ChannelPlate.js"] // workaround CSP
+    },
   "permissions" :
     [
       "debugger"
