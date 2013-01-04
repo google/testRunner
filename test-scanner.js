@@ -46,12 +46,11 @@ function scanFolder(folder)
             doc.body.innerHTML = html;
             var links = doc.querySelectorAll("a");
             for (var i = 0; i < links.length; ++i) {
-                var link = links[i].href;
-                var match = link.match(/[^\/]*\/([^\/]+\.html)$/);
+                var href = links[i].getAttribute('href');
+                var match = href.match(/[^\/]*\/([^\/]+\.html)$/);
                 if (!match)
                     continue;
-                var path = "/LayoutTests/" + folder + "/" + match[1];
-                fetchExpectations(link);
+                fetchExpectations(href);
             }
         },
         function onerror(message) {
@@ -73,8 +72,10 @@ function fetchExpectations(path, callback)
             if (this.path.indexOf(chromiumSegment) !== -1) {
                 // If we don't find the expectations under chromium, try webkit proper
                 fetch(path, filter, function() {
-                  console.warn("Failed to load "+path);
+                  console.warn("Failed to find test case "+path);
                 });                
+            } else {
+                console.warn("2 x 404");
             }
             return;
         }
@@ -90,13 +91,13 @@ function fetchExpectations(path, callback)
             }
             filtered.push(expectationLines[i]);
         }
-        var test = [path, filtered.join("\n")];
+        var testExpectations = [path, filtered.join("\n")];
         console.log("added "+path);
-        window.parent.postMessage(["test", test], "*");
+        window.parent.postMessage(["test", testExpectations], "*");
     }
     
     fetch(chromiumPath, filter, function() {
-            console.warn("Failed to load "+path);
+            console.warn("Failed to load from chromium"+chromiumPath);
     });
 }
 
