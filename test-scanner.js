@@ -14,7 +14,7 @@ function request(method, url, callback, errback) {
     if (!this.requestCreator) {
         this.requestCreator = new ChannelPlate.RequestCreator(ChannelPlate.DevtoolsTalker);
     }
-    this.requestCreator.request('PROPFIND', [url], function() {
+    this.requestCreator.request(method, [url], function() {
         if (arguments[0] === "Error") {
           var message = arguments[1];
           console.error("XHR Failed for "+url, message);
@@ -36,12 +36,14 @@ function request(method, url, callback, errback) {
 }
 */
 
+var parser = new DOMParser();
+
 function scanFolder(folder)
 {
     var url = baseURL+"/LayoutTests/" + folder + "/";
-    request('PROPFIND', url, function onload() {
-            console.log(xhr.responseXML.documentElement.nodeName);
-            var doc = xhr.responseXML;
+    request('GET', url, function onload(html) {
+            var doc = document.implementation.createHTMLDocument("");
+            doc.body.innerHTML = html;
             var links = doc.querySelectorAll("a");
             for (var i = 0; i < links.length; ++i) {
                 var link = links[i].href;

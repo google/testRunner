@@ -8,11 +8,12 @@
    "devtools_page": "testRunnerDevtoolsPage.html",
    "options_page": "options.html",
     "background": {
-      "scripts": ["ChannelPlate/ChannelPlate.js"] // workaround CSP
+      "scripts": ["ChannelPlate/ChannelPlate.js", "ChannelPlate/ChannelPlateBackground.js"] // workaround CSP
     },
   "permissions" :
     [
-      "debugger"
+      "http://*/",
+      "https://*/"
     ],
     "web_accessible_resources":
     [

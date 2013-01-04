@@ -279,6 +279,8 @@ StandaloneTestRunner.prototype = {
 function onMessageFromTestPage(event)
 {
     var signature = event.data;
+    if (!signature.shift) 
+        return;
     var method = signature.shift();
     if (method === 'test') {
         tests.push(signature[0]);
