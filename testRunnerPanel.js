@@ -1,7 +1,6 @@
 
 var layoutTestsServer = "http://localhost:8002/";
 var scannerServer = "./";
-var remoteDebuggingServer = "http://localhost:9222/";
 
 var tests = [];
 var skipList = [
@@ -36,173 +35,131 @@ var skipList = [
     "inspector/profiler/heap-snapshot-inspect-dom-wrapper.html",
     "inspector/timeline/timeline-network-received-data.html",
 ];
-var treeOutline = null;
 
-function run(debug)
-{
-    if (window.runner && debug) {
-        window.runner.continueDebugging();
-        return;
-    }
+var TestRunnerPanel = { 
+    tests: []
+};
 
-    if (window.runner)
-        window.runner.cleanup();
-
-    window.debug = debug;
-
-    runTests();
-}
-
-function runTests()
-{
+TestRunnerPanel.loadTests = function loadTests() {
     document.getElementById("outline").removeChildren();
-    treeOutline = new TreeOutline(document.getElementById("outline"));
+    TestRunnerPanel.treeOutline = new TreeOutline(document.getElementById("outline"));
+
+    if (window.testScannerIframe) 
+        document.body.removeChild(window.testScannerIframe);
+    window.testScannerIframe = document.createElement("iframe");
+    window.testScannerIframe.src = scannerServer + "test-scanner.html";
+    document.body.appendChild(window.testScannerIframe);
 
     document.getElementById("pass").textContent = 0;
     document.getElementById("skip").textContent = 0;
     document.getElementById("fail").textContent = 0;
     document.getElementById("timeout").textContent = 0;
-    document.getElementById("remaining").textContent = tests.length;
 
-    runNextTest();
+    delete this.currentTestRunner;
+};
+
+TestRunnerPanel.addTest = function(model) {
+    var view = new TestView(model);
+    this.tests.push({model: model, view: view});
+    document.getElementById("remaining").textContent = this.tests.length;
 }
 
-function interrupt()
+TestRunnerPanel.run = function(debug)
 {
-    tests = [];
+    if (this.currentTestRunner)
+        this.currentTestRunner.cleanup();
+
+    document.body.classList.remove('interrupted');
+
+    this.runTests(debug);
+};
+
+TestRunnerPanel.runTests = function runTests(debug)
+{
+    this.debug = debug;
+    this.runNextTest();
 }
 
-function runNextTest(lastResult)
+TestRunnerPanel.interrupt = function interrupt()
+{
+    document.body.classList.add('interrupted');
+}
+
+TestRunnerPanel.runNextTest = function runNextTest(lastResult)
 {
     if (lastResult) {
         var element = document.getElementById(lastResult);
         element.textContent = parseInt(element.textContent) + 1;
 
         element = document.getElementById("remaining");
-        element.textContent = parseInt(element.textContent) - 1;
+        element.textContent = '' + this.tests.length;
         if (window.debug) {
             document.getElementById("debug").textContent = "Debug";
             return;
         }
     }
-
-    var test;
-    var filter = document.getElementById("filter").value;
-    while (test = tests.shift()) {
-        if (!filter || test[0].match(filter)) {
-            new StandaloneTestRunner(test[0], test[1], runNextTest.bind(null));
-            return;
-        }
+    if (document.body.classList.contains('interrupted')) {
+        return;
+    }
+    var test = this.tests.shift();
+    if (test) {
+      this.currentTestRunner = new TestRunner(test.model, test.view, runNextTest.bind(this));
+      this.currentTestRunner.run(this.debug);  
     }
 }
 
-function StandaloneTestRunner(testPath, expected, next)
-{
-    this._testPath = testPath;
-    this._next = next;
-    this._expected = expected;
-    this._pendingMessages = [];
+TestRunnerPanel.attachListeners = function attachListeners() {
+    document.querySelector('.load').addEventListener('click', function(){
+        TestRunnerPanel.loadTests();
+    });document.querySelector('.run').addEventListener('click', function(){
+        TestRunnerPanel.run();
+    });
+    document.querySelector('.debug').addEventListener('click', function(){
+        TestRunnerPanel.run(true);
+    });    
+    document.querySelector('.interrupt').addEventListener('click', function(){
+        TestRunnerPanel.interrupt();
+    });
+}
 
-    this._treeElement = new TreeElement(testPath);
-    treeOutline.appendChild(this._treeElement);
+function TestModel(url, expected) {
+    this.url = url;
+    this.expected = expected;
+}
 
-    for (var i = 0; !window.debug && i < skipList.length; ++i) {
+function TestView(testModel) {
+    this._testModel = testModel;
+
+    this._treeElement = new TreeElement(this._testModel.url);
+    TestRunnerPanel.treeOutline.appendChild(this._treeElement);
+}
+
+TestView.prototype = {
+    checkSkipped: function() {  // <<<<<<<<<<<<<TODO
+        for (var i = 0; !window.debug && i < skipList.length; ++i) {
         if (testPath.indexOf(skipList[i]) !== -1) {
             this._treeElement.title = testPath + ": SKIPPED";
             this._next("skip");
             return;
         }
-    }
-    window.runner = this;
-    this._testPage = window.open("about:blank", "inspected", "width=800,height=600");
-
-    window.remoteDebuggingHandshake = this._remoteDebuggingHandshake.bind(this);
-    var script = document.createElement("script");
-    script.src = remoteDebuggingServer + "json?jsonp=remoteDebuggingHandshake";
-    document.head.appendChild(script);
-}
-
-StandaloneTestRunner.FrontendLocation = "inspector.html";
-
-StandaloneTestRunner.prototype = {
-    _remoteDebuggingHandshake: function(data)
-    {
-        for (var i = 0; i < data.length; ++i) {
-            if (data[i].url !== "about:blank")
-                continue;
-            this._debuggerURL = data[i].webSocketDebuggerUrl.replace("://", "=");
-            this._navigateTestPage();
-            break;
-        }
+      }
+    },
+    
+    timedout: function() {
+        this._treeElement.title = this._testModel.url + ": TIMEOUT";
+        this._treeElement.listItemElement.addStyleClass("timeout");
     },
 
-    _navigateTestPage: function()
+    onTreeElementSelect: function () 
     {
-        this._testPage.location.href = this._testPath;
-        var width = localStorage.getItem('inspectorWidth') || 600;
-        var height = localStorage.getItem('inspectorHeight') || 400;
-        var features = "width=" + Math.max(width , 600) + ",height=" + Math.max(height, 400);
-        this._inspectorWindowLoading = window.open(StandaloneTestRunner.FrontendLocation + "?" + this._debuggerURL, "inspector", features);
-        this._inspectorWindowLoading.dispatchStandaloneTestRunnerMessages = true;
-        
-        window.addEventListener('unload', this.cleanup.bind(this));
-
-        if (!window.debug)
-            this._watchDog = setTimeout(this._timeout.bind(this), 10000);
+        var baseEndSentinel = '/inspector/';
+        var baseChars = this._testModel.url.indexOf(baseEndSentinel) + baseEndSentinel.length;
+        if (baseChars > 0) 
+            document.getElementById("filter").value = this._testModel.url.substr(baseChars);
     },
 
-    loadCompleted: function()
-    {
-        if (!window.debug) {
-            this._loadCompleted(this);
-            return;
-        }
-        document.getElementById("debug").textContent = "Continue";
-    },
-
-    continueDebugging: function()
-    {
-        this._loadCompleted();
-    },
-
-    _loadCompleted: function()
-    {
-        this._inspectorWindow = this._inspectorWindowLoading;
-        for (var i = 0; i < this._pendingMessages.length; ++i)
-            this._inspectorWindow.postMessage(this._pendingMessages[i], "*");
-        this._pendingMessages = [];
-    },
-
-    closeWebInspector: function()
-    {
-        if (!window.debug)
-            this._inspectorWindow.close();
-    },
-
-    notifyDone: function(actual)
-    {
-        if (this._done)
-            return;
-        this._done = true;
-
-        if (!window.debug) 
-            this.cleanup()
-
-        clearTimeout(this._watchDog);
-
-        this._treeElement.onselect = this.onTreeElementSelect.bind(this);
-
-        // TODO pavel  is the  RHS || condition wanted?
-        if (actual === this._expected || actual === this._expected + "\n") {
-            this._treeElement.title = this._testPath + ": SUCCESS";
-            this._next("pass");
-            return;
-        }
-
-        this._treeElement.title = this._testPath + ": FAILED";
-        this._treeElement.listItemElement.addStyleClass("failed");
-
-        var baseLines = difflib.stringAsLines(this._expected);
+    _showDiff: function(actual) {
+        var baseLines = difflib.stringAsLines(this._testModel.expected);
         var newLines = difflib.stringAsLines(actual);
         var sm = new difflib.SequenceMatcher(baseLines, newLines);
         var opcodes = sm.get_opcodes();
@@ -235,22 +192,128 @@ StandaloneTestRunner.prototype = {
                 }
             }
         }
-
-        this._next("fail");
     },
 
-    evaluateInWebInspector: function(callId, script)
+    update: function(actual) {
+        this._treeElement.onselect = this.onTreeElementSelect.bind(this);
+
+        if (actual === this._testModel.expected || actual === this._testModel.expected + "\n") {
+            this._treeElement.title = this._testModel.url + ": SUCCESS";
+        } else {
+            this._treeElement.title = this._testModel.url + ": FAILED";
+            this._treeElement.listItemElement.addStyleClass("failed");
+            this._showDiff(actual);
+        }
+    },
+};
+
+function TestRunner(testModel,  testView, next)
+{
+    this._testModel = testModel;
+    this._testView = testView;
+    this._next = next;
+
+    this._pendingMessages = [];
+}
+
+TestRunner.FrontendLocation = "inspector.html";
+
+TestRunner.prototype = {
+
+    run: function(debug)
     {
-        if (this._inspectorWindow)
-            this._inspectorWindow.postMessage(["evaluateForTest", callId, script], "*");
-        else
-            this._pendingMessages.push(["evaluateForTest", callId, script]);
+        // This function runs in the DevtoolsExtended window
+        function runInEveryDebuggeeFrame(testURL) {
+            (function(){
+                // This first part runs in every frame, before any other code
+                window.dispatchStandaloneTestRunnerMessages = true;
+                if (window.location.href !== testURL) {
+                    window.opener = true; // lie so InspectorFrontEndAPI listens for our messages
+                } else {
+                    window.testRunner = { // impl API called by test suite running in the iframe
+                        dumpAsText: function(){ },
+                        waitUntilDone: function(){},
+                        closeWebInspector: function() {
+                            window.parent.postMessage(["closeWebInspector"], "*");
+                        },
+                        notifyDone: function() {
+                            var actual = document.body.innerText + "\n";
+                            window.parent.postMessage(["notifyDone", actual], "*");
+                        },
+                        evaluateInWebInspector: function(callId, script) {
+                            // Call to InspectorFrontEndAPI.evaluateForTest which calls
+                            // WebInspector.evaluateForTestInFrontend, see TestController.js
+                            window.parent.postMessage(["evaluateForTest", callId, script], "*");
+                        },
+                        display: function() { }
+                    };
+                }
+                function monkeyPatch() {
+                    WebInspector.evaluateForTestInFrontend = function(callId, script)
+                    {
+                        window.isUnderTest = true;
+                        function invokeMethod()
+                        {
+                            try {
+                                script = script + "//@ sourceURL=evaluateInWebInspector" + callId + ".js";
+                                var result = window.eval(script);
+                                var message = typeof result === "undefined" ? "\"<undefined>\"" : JSON.stringify(result);
+                                WebInspector.consoleTrue.log("notifyDone:", message)
+                            } catch (e) {
+                                WebInspector.consoleTrue.error("notifyDone:", e);
+                            }
+                        }
+                        InspectorBackend.runAfterPendingDispatches(invokeMethod);
+                    };
+                }    
+                window.addEventListener('load', function checkForInspector(){
+                    console.log('testRunner found load event in '+window.location);
+                    if (window.WebInspector) {  // this part only runs in one frame and on load  
+                        console.log('testRunner found WebInspector event in '+window.location);
+                        // navigate the victim page to our testURL
+                       // RuntimeAgent.evaluate("window.location="+testURL, "test");
+                        // inspector-test.js will run in this window and overwrite our console.
+                        window.WebInspector.consoleTrue = {
+                            log: console.log.bind(console),
+                            error: console.error.bind(console),
+                            info: console.info.bind(console),
+                        };
+                        monkeyPatch();
+                        var iframe = document.createElement('iframe');
+                        iframe.setAttribute('style', 'width:0;height:0;opacity:0');
+                        document.body.appendChild(iframe);
+                        window.opener = iframe.contentWindow; 
+                        iframe.setAttribute('src', testURL);  // TODO set this with an eval after we know the DevtoolsExtended has loaded extensions
+                        console.log('testRunner set iframe to '+testURL);
+                    } else {
+                        // we are not in the iframe with the WebInspector, do nothing
+                    }
+                });
+            }());
+        }
+        if (!debug)
+            this._watchDog = setTimeout(this._timeout.bind(this), 10000);
+
+        var reloadOptions = {
+            ignoreCache: true, 
+            injectedScript:  '(' + runInEveryDebuggeeFrame + '(\"' + this._testModel.url + '\")' +')',
+          };
+          console.log("injectedScript ", reloadOptions.injectedScript);
+          chrome.devtools.inspectedWindow.reload(reloadOptions);
+    },
+
+    notifyDone: function(actual)
+    {
+        if (this._done)
+            return;
+        this._done = true;
+
+        clearTimeout(this._watchDog);
     },
 
     _timeout: function()
     {
-        this._treeElement.title = this._testPath + ": TIMEOUT";
-        this._treeElement.listItemElement.addStyleClass("timeout");
+        this._testView.timedout();
         this._done = true;
         this.cleanup();
         this._next("timeout");
@@ -258,42 +321,34 @@ StandaloneTestRunner.prototype = {
 
     cleanup: function ()
     {
-        localStorage.setItem('inspectorWidth', this._inspectorWindowLoading.outerWidth);
-        localStorage.setItem('inspectorHeight', this._inspectorWindowLoading.outerHeight);
-        this._inspectorWindowLoading.close();
-        this._testPage.close();
-        delete window.runner;
+        delete this.currentTestRunner;
     },
 
-    onTreeElementSelect: function () 
-    {
-        var baseEndSentinel = '/inspector/';
-        var baseChars = this._testPath.indexOf(baseEndSentinel) + baseEndSentinel.length;
-        if (baseChars > 0) 
-            document.getElementById("filter").value = this._testPath.substr(baseChars);
-    },
-
-    display: function() { }
 }
 
-function onMessageFromTestPage(event)
+function onMessageFromTestScanner(event)
 {
     var signature = event.data;
     if (!signature.shift) 
         return;
     var method = signature.shift();
     if (method === 'test') {
-        tests.push(signature[0]);
+        var testData = signature[0];
+        var model = new TestModel(testData[0], testData[2]);
+        var filterText = document.getElementById("filter").value;
+        var reFilter = filterText ? new RegExp(filterText) : null;
+        if (reFilter) {
+            if (!reFilter.test(model.url))
+                return;
+        }
+        TestRunnerPanel.addTest(model);
     }
-
-    if (window.runner)
-        window.runner[method].apply(window.runner, signature);
 }
-window.addEventListener("message", onMessageFromTestPage, true);
+window.addEventListener("message", onMessageFromTestScanner, true);
 
 function onload()
 {
-     attachListeners();
+     TestRunnerPanel.attachListeners();
 
     var queryParamsObject = {};
     var queryParams = window.location.search;
@@ -309,25 +364,6 @@ function onload()
 }
 window.addEventListener('load', onload);
 
-function loadTests() {
-    if (window.testScannerIframe) 
-        document.body.removeChild(window.testScannerIframe);
-    window.testScannerIframe = document.createElement("iframe");
-    window.testScannerIframe.src = scannerServer + "test-scanner.html";
-    document.body.appendChild(window.testScannerIframe);
-}
 
-function attachListeners() {
-    document.querySelector('.load').addEventListener('click', function(){
-        loadTests();
-    });document.querySelector('.run').addEventListener('click', function(){
-        run();
-    });
-    document.querySelector('.debug').addEventListener('click', function(){
-        run(true);
-    });    
-    document.querySelector('.interrupt').addEventListener('click', function(){
-        interrupt();
-    });
-}
+
 

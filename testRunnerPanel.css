@@ -1,0 +1,21 @@
+:focus {
+    outline: none;
+}
+
+.failed {
+    color: red;
+}
+
+.timeout {
+    color: brown;
+}
+
+ .interrupted .interrupt {
+  color:red;
+}
+
+iframe {
+    width: 0;
+    height: 0;
+    opacity: 0;
+}

@@ -17,7 +17,6 @@ function request(method, url, callback, errback) {
     this.requestCreator.request(method, [url], function() {
         if (arguments[0] === "Error") {
           var message = arguments[1];
-          console.error("XHR Failed for "+url, message);
           errback(message);
         } else {
           callback(arguments[0]);
@@ -50,7 +49,7 @@ function scanFolder(folder)
                 var match = href.match(/[^\/]*\/([^\/]+\.html)$/);
                 if (!match)
                     continue;
-                fetchExpectations(href);
+                fetchExpectations(baseURL + href);
             }
         },
         function onerror(message) {
@@ -61,26 +60,14 @@ function scanFolder(folder)
 
 function fetchExpectations(path, callback)
 {
+    var testCaseURL = path;
     var ext = path.lastIndexOf(".");
     path = path.substring(0, ext) + "-expected.txt";
     
     var chromiumSegment = "/LayoutTests/platform/chromium/";
     var chromiumPath = path.replace("/LayoutTests/", chromiumSegment);
 
-    function filter(webkitPath) {
-        if (this.status === 404) {
-            if (this.path.indexOf(chromiumSegment) !== -1) {
-                // If we don't find the expectations under chromium, try webkit proper
-                fetch(path, filter, function() {
-                  console.warn("Failed to find test case "+path);
-                });                
-            } else {
-                console.warn("2 x 404");
-            }
-            return;
-        }
-            
-        var expectations = this.responseText;
+    function filter(expectations) {  
         var expectationLines = expectations.split("\n");
         var filtered = [];
         for (var i = 0; i < expectationLines.length; ++i) {
@@ -91,23 +78,27 @@ function fetchExpectations(path, callback)
             }
             filtered.push(expectationLines[i]);
         }
-        var testExpectations = [path, filtered.join("\n")];
+        var testExpectations = [testCaseURL, path, filtered.join("\n")];
         console.log("added "+path);
         window.parent.postMessage(["test", testExpectations], "*");
     }
     
-    fetch(chromiumPath, filter, function() {
-            console.warn("Failed to load from chromium"+chromiumPath);
+    fetch(chromiumPath, filter, function(msg) {
+        if (msg === 404) {
+                // If we don't find the expectations under chromium, try webkit proper
+                fetch(path, filter, function(msg) {
+                  console.warn("Failed to find test case "+path, msg);
+                });     
+        } else {
+            console.warn("Failed to load from chromium"+chromiumPath, msg);
+        }
+            
     });
 }
 
 function fetch(path, callback, errback)
 {
-    var xhr = new XMLHttpRequest();
-    xhr.onload = callback;
-    xhr.onerror = errback;
-    xhr.path = path;
-    xhr.open("GET", path);
-    xhr.send(null);
+    request('GET', path, callback, errback);
+    return;
 }
 
