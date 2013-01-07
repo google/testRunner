@@ -54,6 +54,7 @@ TestRunnerPanel.loadTests = function loadTests() {
     document.getElementById("skip").textContent = 0;
     document.getElementById("fail").textContent = 0;
     document.getElementById("timeout").textContent = 0;
+    document.getElementById("remaining").textContent  = 0;
 
     delete this.currentTestRunner;
 };
@@ -199,10 +200,13 @@ TestView.prototype = {
 
         if (actual === this._testModel.expected || actual === this._testModel.expected + "\n") {
             this._treeElement.title = this._testModel.url + ": SUCCESS";
+            return true;
         } else {
+            console.log("expected", this._testModel.expected);
             this._treeElement.title = this._testModel.url + ": FAILED";
             this._treeElement.listItemElement.addStyleClass("failed");
             this._showDiff(actual);
+            return false;
         }
     },
 };
@@ -238,8 +242,14 @@ TestRunner.prototype = {
     _onMessageAdded: function(message) {
         var mark = message.text.indexOf(SignalTokens.RESULT);
         if (mark !== -1) {
-          this._testView.update(message.text.substring(mark));    
-          chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded);  
+            this.actual = this.actual || "";
+            this.actual += message.text.substring(mark + SignalTokens.RESULT.length) + '\n';
+        } else {
+          mark = message.text.indexOf(SignalTokens.COMPLETE);
+          if (mark !== -1) {
+            this.actual += '\n';
+            this.notifyDone(this.actual);
+          }
         }
     },
 
@@ -249,6 +259,7 @@ TestRunner.prototype = {
             (function(){
                 // This first part runs in every frame, before any other code
                 window.dispatchStandaloneTestRunnerMessages = true;
+                window.SignalTokens = JSON.parse(jsonSignalTokens);
                 if (window.location.href !== testURL) {
                     window.opener = true; // lie so InspectorFrontEndAPI listens for our messages
                 } else {
@@ -256,17 +267,15 @@ TestRunner.prototype = {
                     window.testRunner = { // impl API called by test suite running in the iframe
                         dumpAsText: function(){ },
                         waitUntilDone: function(){},
-                        closeWebInspector: function() {
-                            window.parent.postMessage(["closeWebInspector"], "*");
-                        },
-                        notifyDone: function() {
-                            var actual = document.body.innerText + "\n";
-                            window.parent.postMessage(["notifyDone", actual], "*");
-                        },
+                        closeWebInspector: function() { },
+                        notifyDone: function() { },
                         evaluateInWebInspector: function(callId, script) {
-                            // Call to InspectorFrontEndAPI.evaluateForTest which calls
-                            // WebInspector.evaluateForTestInFrontend, see TestController.js
                             window.parent.postMessage(["evaluateForTest", callId, script], "*");
+                            if (!window.sentActualHeader) {
+                                window.sentActualHeader = true;
+                                var actualHeader = 'InspectorTest.addResult(unescape(\"' + escape(document.body.innerText + '\n') + '\"))';
+                                window.parent.postMessage(["evaluateForTest", 99, actualHeader],"*");
+                            }
                         },
                         display: function() { }
                     };
@@ -274,7 +283,6 @@ TestRunner.prototype = {
                     // Runs in WebInspector window
                     window.initialize_monkeyPatchInspectorTest = function() {
                         console.log("monkeyPatch InspectorTest");
-                        var SignalTokens = JSON.parse(jsonSignalTokens);
                         InspectorTest.Output = {   // override in window.initialize_yourName
                             testComplete: function() 
                             {
@@ -302,9 +310,9 @@ TestRunner.prototype = {
                                 script = script + "//@ sourceURL=evaluateInWebInspector" + callId + ".js";
                                 var result = window.eval(script);
                                 var message = typeof result === "undefined" ? "\"<undefined>\"" : JSON.stringify(result);
-                                WebInspector.consoleTrue.log("notifyDone:", message)
+                                WebInspector.consoleTrue.log("WebInspector eval result:", message)
                             } catch (e) {
-                                WebInspector.consoleTrue.error("notifyDone:" + e, e.stack);
+                                WebInspector.consoleTrue.error("WebInspector eval error:" + e, e.stack);
                             }
                         }
                         InspectorBackend.runAfterPendingDispatches(invokeMethod);
@@ -348,11 +356,11 @@ TestRunner.prototype = {
 
     notifyDone: function(actual)
     {
-        if (this._done)
-            return;
-        this._done = true;
-
-        clearTimeout(this._watchDog);
+        console.log("actual", this.actual);
+        var pass = this._testView.update(this.actual);    
+        chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded); 
+        clearTimeout(this._watchDog);   
+        this._next( pass ? 'pass' : 'fail');
     },
 
     _timeout: function()
