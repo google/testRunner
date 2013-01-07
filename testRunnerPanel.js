@@ -214,22 +214,45 @@ function TestRunner(testModel,  testView, next)
     this._next = next;
 
     this._pendingMessages = [];
+    this._onMessageAdded = this._onMessageAdded.bind(this);
 }
 
-TestRunner.FrontendLocation = "inspector.html";
+var SignalTokens = {
+    COMPLETE: "InspectorTest.testComplete: ",
+    RESULT: "InspectorTest.addResult: ",
+    CLEAR: "InspectorTest.clearResults: ",
+};
 
 TestRunner.prototype = {
 
     run: function(debug)
     {
+        this._listenForResults();
+        this._reloadWithTestScripts(debug);
+    },
+
+    _listenForResults: function() {
+        chrome.experimental.devtools.console.onMessageAdded.addListener(this._onMessageAdded);
+    },
+
+    _onMessageAdded: function(message) {
+        var mark = message.text.indexOf(SignalTokens.RESULT);
+        if (mark !== -1) {
+          this._testView.update(message.text.substring(mark));    
+          chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded);  
+        }
+    },
+
+    _reloadWithTestScripts: function(debug) {
         // This function runs in the DevtoolsExtended window
-        function runInEveryDebuggeeFrame(testURL) {
+        function runInEveryDebuggeeFrame(testURL, jsonSignalTokens) {
             (function(){
                 // This first part runs in every frame, before any other code
                 window.dispatchStandaloneTestRunnerMessages = true;
                 if (window.location.href !== testURL) {
                     window.opener = true; // lie so InspectorFrontEndAPI listens for our messages
                 } else {
+                    // Runs only in test-script iframe
                     window.testRunner = { // impl API called by test suite running in the iframe
                         dumpAsText: function(){ },
                         waitUntilDone: function(){},
@@ -247,7 +270,28 @@ TestRunner.prototype = {
                         },
                         display: function() { }
                     };
+                    // Called after InspectorTest is created, see inspector-test.js
+                    // Runs in WebInspector window
+                    window.initialize_monkeyPatchInspectorTest = function() {
+                        console.log("monkeyPatch InspectorTest");
+                        var SignalTokens = JSON.parse(jsonSignalTokens);
+                        InspectorTest.Output = {   // override in window.initialize_yourName
+                            testComplete: function() 
+                            {
+                                WebInspector.consoleTrue.log(SignalTokens.COMPLETE, InspectorTest.completeTestCallId);
+                            },
+                            addResult: function(text) 
+                            {
+                                WebInspector.consoleTrue.log(SignalTokens.RESULT + text);
+                            },
+                            clearResults: function() 
+                            {
+                                WebInspector.consoleTrue.log(SignalTokens.CLEAR);
+                            }
+                        };
+                    }
                 }
+                // Runs only in WebInspector window
                 function monkeyPatch() {
                     WebInspector.evaluateForTestInFrontend = function(callId, script)
                     {
@@ -260,7 +304,7 @@ TestRunner.prototype = {
                                 var message = typeof result === "undefined" ? "\"<undefined>\"" : JSON.stringify(result);
                                 WebInspector.consoleTrue.log("notifyDone:", message)
                             } catch (e) {
-                                WebInspector.consoleTrue.error("notifyDone:", e);
+                                WebInspector.consoleTrue.error("notifyDone:" + e, e.stack);
                             }
                         }
                         InspectorBackend.runAfterPendingDispatches(invokeMethod);
@@ -296,10 +340,10 @@ TestRunner.prototype = {
 
         var reloadOptions = {
             ignoreCache: true, 
-            injectedScript:  '(' + runInEveryDebuggeeFrame + '(\"' + this._testModel.url + '\")' +')',
+            injectedScript:  '(' + runInEveryDebuggeeFrame + '(\"' + this._testModel.url + '\", \'' + JSON.stringify(SignalTokens) + '\')' +')',
           };
-          console.log("injectedScript ", reloadOptions.injectedScript);
-          chrome.devtools.inspectedWindow.reload(reloadOptions);
+        console.log("injectedScript ", reloadOptions.injectedScript);
+        chrome.devtools.inspectedWindow.reload(reloadOptions);
     },
 
     notifyDone: function(actual)

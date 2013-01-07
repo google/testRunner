@@ -12,8 +12,9 @@
     },
   "permissions" :
     [
-      "http://*/",
-      "https://*/"
+      "http://*/", // Cross site XHR
+      "https://*/", 
+      "experimental"  // chrome.experimental.devtools.console 
     ],
     "web_accessible_resources":
     [
