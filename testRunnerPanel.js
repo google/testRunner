@@ -143,6 +143,7 @@ TestView.prototype = {
     timedout: function() {
         this._treeElement.title = this._testModel.url + ": TIMEOUT";
         this._treeElement.listItemElement.addStyleClass("timeout");
+        this._treeElement.listItemElement.removeStyleClass("running");
     },
 
     onTreeElementSelect: function () 

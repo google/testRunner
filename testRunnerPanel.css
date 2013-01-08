@@ -9,7 +9,7 @@
     color: green;
 }
 .running {
-    font-style: bold;
+    font-weight: bold;
 }
 .timeout {
     color: brown;
