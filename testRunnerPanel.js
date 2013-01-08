@@ -136,14 +136,11 @@ function TestView(testModel) {
 }
 
 TestView.prototype = {
-    checkSkipped: function() {  // <<<<<<<<<<<<<TODO
-        for (var i = 0; !window.debug && i < skipList.length; ++i) {
-        if (testPath.indexOf(skipList[i]) !== -1) {
-            this._treeElement.title = testPath + ": SKIPPED";
-            this._next("skip");
-            return;
-        }
-      }
+    skipped: function() {  
+       this._treeElement.title = this._testModel.url + ": SKIPPED"; 
+       console.log("skipped");
+            console.trace();
+               
     },
     
     timedout: function() {
@@ -195,16 +192,23 @@ TestView.prototype = {
         }
     },
 
+    running: function() {
+        this._treeElement.listItemElement.addStyleClass("running");
+    },
+
     update: function(actual) {
         this._treeElement.onselect = this.onTreeElementSelect.bind(this);
-
+        this._treeElement.listItemElement.removeStyleClass("running");
         if (actual === this._testModel.expected || actual === this._testModel.expected + "\n") {
             this._treeElement.title = this._testModel.url + ": SUCCESS";
+            this._treeElement.listItemElement.addStyleClass("pass");
             return true;
         } else {
-            console.log("expected", this._testModel.expected);
+            if (TestRunnerPanel.debugDiffs) console.log("expected", this._testModel.expected);
             this._treeElement.title = this._testModel.url + ": FAILED";
-            this._treeElement.listItemElement.addStyleClass("failed");
+            console.log("FAILED");
+            console.trace();
+            this._treeElement.listItemElement.addStyleClass("fail");
             this._showDiff(actual);
             return false;
         }
@@ -231,6 +235,19 @@ TestRunner.prototype = {
 
     run: function(debug)
     {
+        if (!debug) {
+            var skipMe = skipList.some(function(path){
+                return (this._testModel.url.indexOf(path) !== -1);
+            }.bind(this)) 
+
+            if (skipMe) {
+                this._testView.skipped();
+                this._next("skip");
+                return;
+            }
+        }
+
+        this._testView.running();
         this._listenForResults();
         this._reloadWithTestScripts(debug);
     },
@@ -350,13 +367,12 @@ TestRunner.prototype = {
             ignoreCache: true, 
             injectedScript:  '(' + runInEveryDebuggeeFrame + '(\"' + this._testModel.url + '\", \'' + JSON.stringify(SignalTokens) + '\')' +')',
           };
-        console.log("injectedScript ", reloadOptions.injectedScript);
         chrome.devtools.inspectedWindow.reload(reloadOptions);
     },
 
     notifyDone: function(actual)
     {
-        console.log("actual", this.actual);
+        if (TestRunnerPanel.debugDiffs) console.log("actual", this.actual);
         var pass = this._testView.update(this.actual);    
         chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded); 
         clearTimeout(this._watchDog);   

@@ -2,10 +2,15 @@
     outline: none;
 }
 
-.failed {
+.fail {
     color: red;
 }
-
+.pass {
+    color: green;
+}
+.running {
+    font-style: bold;
+}
 .timeout {
     color: brown;
 }
