@@ -138,9 +138,6 @@ function TestView(testModel) {
 TestView.prototype = {
     skipped: function() {  
        this._treeElement.title = this._testModel.url + ": SKIPPED"; 
-       console.log("skipped");
-            console.trace();
-               
     },
     
     timedout: function() {
@@ -206,8 +203,6 @@ TestView.prototype = {
         } else {
             if (TestRunnerPanel.debugDiffs) console.log("expected", this._testModel.expected);
             this._treeElement.title = this._testModel.url + ": FAILED";
-            console.log("FAILED");
-            console.trace();
             this._treeElement.listItemElement.addStyleClass("fail");
             this._showDiff(actual);
             return false;
