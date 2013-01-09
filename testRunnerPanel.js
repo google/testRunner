@@ -44,12 +44,6 @@ TestRunnerPanel.loadTests = function loadTests() {
     document.getElementById("outline").removeChildren();
     TestRunnerPanel.treeOutline = new TreeOutline(document.getElementById("outline"));
 
-    if (window.testScannerIframe) 
-        document.body.removeChild(window.testScannerIframe);
-    window.testScannerIframe = document.createElement("iframe");
-    window.testScannerIframe.src = scannerServer + "test-scanner.html";
-    document.body.appendChild(window.testScannerIframe);
-
     document.getElementById("pass").textContent = 0;
     document.getElementById("skip").textContent = 0;
     document.getElementById("fail").textContent = 0;
@@ -57,6 +51,13 @@ TestRunnerPanel.loadTests = function loadTests() {
     document.getElementById("remaining").textContent  = 0;
 
     delete this.currentTestRunner;
+    this.tests = [];
+
+    if (window.testScannerIframe) 
+        document.body.removeChild(window.testScannerIframe);
+    window.testScannerIframe = document.createElement("iframe");
+    window.testScannerIframe.src = scannerServer + "test-scanner.html";
+    document.body.appendChild(window.testScannerIframe);
 };
 
 TestRunnerPanel.addTest = function(model) {
@@ -67,9 +68,6 @@ TestRunnerPanel.addTest = function(model) {
 
 TestRunnerPanel.run = function(debug)
 {
-    if (this.currentTestRunner)
-        this.currentTestRunner.cleanup();
-
     document.body.classList.remove('interrupted');
 
     this.runTests(debug);
@@ -133,17 +131,12 @@ function TestView(testModel) {
 
     this._treeElement = new TreeElement(this._testModel.url);
     TestRunnerPanel.treeOutline.appendChild(this._treeElement);
+    this._treeElement.onselect = this.onTreeElementSelect.bind(this);
 }
 
 TestView.prototype = {
     skipped: function() {  
        this._treeElement.title = this._testModel.url + ": SKIPPED"; 
-    },
-    
-    timedout: function() {
-        this._treeElement.title = this._testModel.url + ": TIMEOUT";
-        this._treeElement.listItemElement.addStyleClass("timeout");
-        this._treeElement.listItemElement.removeStyleClass("running");
     },
 
     onTreeElementSelect: function () 
@@ -192,21 +185,34 @@ TestView.prototype = {
 
     running: function() {
         this._treeElement.listItemElement.addStyleClass("running");
+        console.log("begin "+this._testModel.url);
+    },
+
+    restyle: function(status) {
+        this._treeElement.title = this._testModel.url + ": " + status.toUpperCase();
+        this._treeElement.listItemElement.addStyleClass(status);
+        console.log("end " + status + " "  + this._testModel.url);
+        this.done = true;
+        return status;
     },
 
     update: function(actual) {
-        this._treeElement.onselect = this.onTreeElementSelect.bind(this);
         this._treeElement.listItemElement.removeStyleClass("running");
-        if (actual === this._testModel.expected || actual === this._testModel.expected + "\n") {
-            this._treeElement.title = this._testModel.url + ": SUCCESS";
-            this._treeElement.listItemElement.addStyleClass("pass");
-            return true;
+        if (this.done) {
+            throw new Error("We're done already with "+this._testModel.url)
+        }
+        if (!actual) {
+            return this.restyle('timedout');
+        } else if (actual === this._testModel.expected || actual === this._testModel.expected + "\n") {
+            return this.restyle('pass');
         } else {
-            if (TestRunnerPanel.debugDiffs) console.log("expected", this._testModel.expected);
-            this._treeElement.title = this._testModel.url + ": FAILED";
-            this._treeElement.listItemElement.addStyleClass("fail");
             this._showDiff(actual);
-            return false;
+            var link = new TreeElement('expected');
+            link.onselect = function() {
+                window.open(this._testModel.url.replace(".html", "-expected.txt"));
+            }.bind(this)
+            this._treeElement.appendChild(link);
+            return this.restyle('fail');
         }
     },
 };
@@ -296,7 +302,7 @@ TestRunner.prototype = {
                     // Runs in WebInspector window
                     window.initialize_monkeyPatchInspectorTest = function() {
                         console.log("monkeyPatch InspectorTest");
-                        InspectorTest.Output = {   // override in window.initialize_yourName
+                        InspectorTest.Output = {  
                             testComplete: function() 
                             {
                                 WebInspector.consoleTrue.log(SignalTokens.COMPLETE, InspectorTest.completeTestCallId);
@@ -335,30 +341,71 @@ TestRunner.prototype = {
                     console.log('testRunner found load event in '+window.location);
                     if (window.WebInspector) {  // this part only runs in one frame and on load  
                         console.log('testRunner found WebInspector event in '+window.location);
-                        // navigate the victim page to our testURL
-                       // RuntimeAgent.evaluate("window.location="+testURL, "test");
-                        // inspector-test.js will run in this window and overwrite our console.
+                        
+                        var iframe = document.createElement('iframe');
+                        iframe.setAttribute('style', 'width:0;height:0;opacity:0');
+                        document.body.appendChild(iframe);
+                        window.opener = iframe.contentWindow; 
+
+                        // TODO set this with an eval after we know the DevtoolsExtended has loaded extensions
+                        WebInspector.notifications.addEventListener('InspectorLoaded', function () {
+                            WebInspector.consoleTrue.log("InspectorLoaded");
+                            // navigate the victim page to our testURL
+                            var navigated = WebInspector.ResourceTreeModel.EventTypes.InspectedURLChanged;
+                            function evaluateInConsole(code) {
+                                WebInspector.consoleView.visible = true;
+                                WebInspector.consoleView.prompt.text = code;
+                                var event = document.createEvent("KeyboardEvent");
+                                event.initKeyboardEvent("keydown", true, true, null, "Enter", "");
+                                WebInspector.consoleView.prompt.proxyElement.dispatchEvent(event);
+                            }
+                            var webInspectorRequiredThis = {
+                              onNavigated: function(event) {
+                                var url = event.data;
+                                WebInspector.consoleTrue.log("testRunner: page navigated to ", url);
+                                if (url === testURL) {
+                                    WebInspector.resourceTreeModel.removeEventListener(
+                                        navigated, 
+                                        webInspectorRequiredThis.onNavigated, 
+                                        webInspectorRequiredThis
+                                    );
+                                    iframe.setAttribute('src', testURL);
+                                    WebInspector.consoleTrue.log('testRunner set iframe to '+testURL);
+                                } else {
+                                    evaluateInConsole('window.location=\"' + testURL + '\"', "test");
+                                    WebInspector.consoleTrue.log('testRunner repeat window.location to  ' + testURL);
+                                }
+                              }
+                            }
+                            // See ExtensionServer.js
+                            WebInspector.resourceTreeModel.addEventListener(
+                                navigated, 
+                                webInspectorRequiredThis.onNavigated, 
+                                webInspectorRequiredThis
+                            );
+                            evaluateInConsole('window.location=\"' + testURL + '\"', "test");
+                            WebInspector.consoleTrue.log('testRunner window.location to  ' + testURL);
+                        });
+
+                       // save console since inspector-test.js will run in this window and overwrite our console.
                         window.WebInspector.consoleTrue = {
                             log: console.log.bind(console),
                             error: console.error.bind(console),
                             info: console.info.bind(console),
                         };
                         monkeyPatch();
-                        var iframe = document.createElement('iframe');
-                        iframe.setAttribute('style', 'width:0;height:0;opacity:0');
-                        document.body.appendChild(iframe);
-                        window.opener = iframe.contentWindow; 
-                        iframe.setAttribute('src', testURL);  // TODO set this with an eval after we know the DevtoolsExtended has loaded extensions
-                        console.log('testRunner set iframe to '+testURL);
+
                     } else {
                         // we are not in the iframe with the WebInspector, do nothing
                     }
                 });
             }());
         }
-        if (!debug)
-            this._watchDog = setTimeout(this._timeout.bind(this), 10000);
-
+        if (!debug)  {
+            // No parameter to notifyDone signals timedout
+            this._watchDog = setTimeout(this.notifyDone.bind(this), 10000);
+        }
+            
         var reloadOptions = {
             ignoreCache: true, 
             injectedScript:  '(' + runInEveryDebuggeeFrame + '(\"' + this._testModel.url + '\", \'' + JSON.stringify(SignalTokens) + '\')' +')',
@@ -369,25 +416,11 @@ TestRunner.prototype = {
     notifyDone: function(actual)
     {
         if (TestRunnerPanel.debugDiffs) console.log("actual", this.actual);
-        var pass = this._testView.update(this.actual);    
         chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded); 
         clearTimeout(this._watchDog);   
-        this._next( pass ? 'pass' : 'fail');
+        var pass = this._testView.update(this.actual);    
+        this._next(pass);
     },
-
-    _timeout: function()
-    {
-        this._testView.timedout();
-        this._done = true;
-        this.cleanup();
-        this._next("timeout");
-    },
-
-    cleanup: function ()
-    {
-        delete this.currentTestRunner;
-    },
-
 }
 
 function onMessageFromTestScanner(event)

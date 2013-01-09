@@ -11,7 +11,7 @@
 .running {
     font-weight: bold;
 }
-.timeout {
+.timedout {
     color: brown;
 }
 
