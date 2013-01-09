@@ -2,9 +2,10 @@
 var tests = [];
 var baseURL = "http://localhost:9696"
 scanFolder("inspector/console");
-// scanFolder("inspector/debugger");
+scanFolder("inspector/debugger");
 scanFolder("inspector/editor");
 scanFolder("inspector/elements");
+scanFolder("inspector/extensions");
 scanFolder("inspector/profiler");
 scanFolder("inspector/styles");
 scanFolder("inspector/timeline");
@@ -23,17 +24,6 @@ function request(method, url, callback, errback) {
         }
   });
 }
-/*
-function request(method, url, callback, errback) {
-    var xhr = new XMLHttpRequest();
-    xhr.onload = callback;
-    xhr.onerror = errback;
-    xhr.open(method, url);
-    if (method === "PROFFIND") 
-      xhr.responseType = "document";
-    xhr.send(null);  
-}
-*/
 
 var parser = new DOMParser();
 
