@@ -121,30 +121,31 @@ TestRunnerPanel.attachListeners = function attachListeners() {
     });
 }
 
-function TestModel(url, expected) {
-    this.url = url;
+function TestModel(testCaseURL, expectedURL, expected) {
+    this.url = testCaseURL;
+    this.expectedURL = expectedURL;
     this.expected = expected;
 }
 
 function TestView(testModel) {
     this._testModel = testModel;
 
-    this._treeElement = new TreeElement(this._testModel.url);
+    this._treeElement = new TreeElement(this._testModel.expectedURL);
     TestRunnerPanel.treeOutline.appendChild(this._treeElement);
     this._treeElement.onselect = this.onTreeElementSelect.bind(this);
 }
 
 TestView.prototype = {
     skipped: function() {  
-       this._treeElement.title = this._testModel.url + ": SKIPPED"; 
+       this._treeElement.title = this._testModel.expectedURL + ": SKIPPED"; 
     },
 
     onTreeElementSelect: function () 
     {
         var baseEndSentinel = '/inspector/';
-        var baseChars = this._testModel.url.indexOf(baseEndSentinel) + baseEndSentinel.length;
+        var baseChars = this._testModel.expectedURL.indexOf(baseEndSentinel) + baseEndSentinel.length;
         if (baseChars > 0) 
-            document.getElementById("filter").value = this._testModel.url.substr(baseChars);
+            document.getElementById("filter").value = this._testModel.expectedURL.substr(baseChars);
     },
 
     _showDiff: function(actual) {
@@ -185,13 +186,13 @@ TestView.prototype = {
 
     running: function() {
         this._treeElement.listItemElement.addStyleClass("running");
-        console.log("begin "+this._testModel.url);
+        console.log("begin "+this._testModel.expectedURL);
     },
 
     restyle: function(status) {
-        this._treeElement.title = this._testModel.url + ": " + status.toUpperCase();
+        this._treeElement.title = this._testModel.expectedURL + ": " + status.toUpperCase();
         this._treeElement.listItemElement.addStyleClass(status);
-        console.log("end " + status + " "  + this._testModel.url);
+        console.log("end " + status + " "  + this._testModel.expectedURL);
         this.done = true;
         return status;
     },
@@ -199,7 +200,7 @@ TestView.prototype = {
     update: function(actual) {
         this._treeElement.listItemElement.removeStyleClass("running");
         if (this.done) {
-            throw new Error("We're done already with "+this._testModel.url)
+            throw new Error("We're done already with "+this._testModel.expectedURL)
         }
         if (!actual) {
             return this.restyle('timedout');
@@ -209,7 +210,7 @@ TestView.prototype = {
             this._showDiff(actual);
             var link = new TreeElement('expected');
             link.onselect = function() {
-                window.open(this._testModel.url.replace(".html", "-expected.txt"));
+                window.open(this._testModel.expectedURL);
             }.bind(this)
             this._treeElement.appendChild(link);
             return this.restyle('fail');
@@ -239,7 +240,7 @@ TestRunner.prototype = {
     {
         if (!debug) {
             var skipMe = skipList.some(function(path){
-                return (this._testModel.url.indexOf(path) !== -1);
+                return (this._testModel.expectedURL.indexOf(path) !== -1);
             }.bind(this)) 
 
             if (skipMe) {
@@ -301,7 +302,6 @@ TestRunner.prototype = {
                     // Called after InspectorTest is created, see inspector-test.js
                     // Runs in WebInspector window
                     window.initialize_monkeyPatchInspectorTest = function() {
-                        console.log("monkeyPatch InspectorTest");
                         InspectorTest.Output = {  
                             testComplete: function() 
                             {
@@ -431,11 +431,11 @@ function onMessageFromTestScanner(event)
     var method = signature.shift();
     if (method === 'test') {
         var testData = signature[0];
-        var model = new TestModel(testData[0], testData[2]);
+        var model = new TestModel(testData.testCaseURL, testData.expectedURL, testData.expected);
         var filterText = document.getElementById("filter").value;
         var reFilter = filterText ? new RegExp(filterText) : null;
         if (reFilter) {
-            if (!reFilter.test(model.url))
+            if (!reFilter.test(model.expectedURL))
                 return;
         }
         TestRunnerPanel.addTest(model);

@@ -18,9 +18,9 @@ function request(method, url, callback, errback) {
     this.requestCreator.request(method, [url], function() {
         if (arguments[0] === "Error") {
           var message = arguments[1];
-          errback(message);
+          errback(url, message);
         } else {
-          callback(arguments[0]);
+          callback(url, arguments[0]);
         }
   });
 }
@@ -30,7 +30,7 @@ var parser = new DOMParser();
 function scanFolder(folder)
 {
     var url = baseURL+"/LayoutTests/" + folder + "/";
-    request('GET', url, function onload(html) {
+    request('GET', url, function onload(urlIn, html) {
             var doc = document.implementation.createHTMLDocument("");
             doc.body.innerHTML = html;
             var links = doc.querySelectorAll("a");
@@ -57,7 +57,7 @@ function fetchExpectations(path, callback)
     var chromiumSegment = "/LayoutTests/platform/chromium/";
     var chromiumPath = path.replace("/LayoutTests/", chromiumSegment);
 
-    function filter(expectations) {  
+    function filter(url, expectations) {  
         var expectationLines = expectations.split("\n");
         var filtered = [];
         for (var i = 0; i < expectationLines.length; ++i) {
@@ -68,19 +68,23 @@ function fetchExpectations(path, callback)
             }
             filtered.push(expectationLines[i]);
         }
-        var testExpectations = [testCaseURL, path, filtered.join("\n")];
+        var testExpectations = {
+            testCaseURL: testCaseURL, 
+            expectedURL: url, 
+            expected: filtered.join("\n")
+        };
         console.log("added "+path);
         window.parent.postMessage(["test", testExpectations], "*");
     }
     
-    fetch(chromiumPath, filter, function(msg) {
+    fetch(chromiumPath, filter, function(url, msg) {
         if (msg === 404) {
                 // If we don't find the expectations under chromium, try webkit proper
-                fetch(path, filter, function(msg) {
-                  console.warn("Failed to find test case "+path, msg);
+                fetch(path, filter, function(url, msg) {
+                  console.warn("Failed to find expected results for test case "+path, msg);
                 });     
         } else {
-            console.warn("Failed to load from chromium"+chromiumPath, msg);
+            console.warn("Failed to load "+ url +" for chromiumPath "+chromiumPath, msg);
         }
             
     });
