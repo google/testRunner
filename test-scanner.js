@@ -1,15 +1,32 @@
 
-var tests = [];
-var baseURL = "http://localhost:9696"
-scanFolder("inspector/console");
-scanFolder("inspector/debugger");
-scanFolder("inspector/editor");
-scanFolder("inspector/elements");
-scanFolder("inspector/extensions");
-scanFolder("inspector/profiler");
-scanFolder("inspector/styles");
-scanFolder("inspector/timeline");
-scanFolder("inspector");
+var LayoutTests = [
+    {
+        windowURL: 'devtools.html',
+        baseURL:  "http://localhost:9696",
+        folders: [
+            "inspector/console",
+            "inspector/debugger",
+            "inspector/editor",
+            "inspector/elements",
+            "inspector/extensions",
+            "inspector/profiler",
+            "inspector/styles",
+            "inspector/timeline",
+            "inspector",
+       ]
+    },
+    {
+        windowURL: 'QuerypointDevtoolsPage.html',
+        baseURL: "http://localhost:8686/test",
+        folders: ["Panel"]
+    }
+];
+
+LayoutTests.forEach(function(layoutTest){
+    layoutTest.folders.forEach(function(folder){
+        scanFolder(layoutTest.baseURL, folder, layoutTest.windowURL);
+    });
+});
 
 function request(method, url, callback, errback) {
     if (!this.requestCreator) {
@@ -27,7 +44,7 @@ function request(method, url, callback, errback) {
 
 var parser = new DOMParser();
 
-function scanFolder(folder)
+function scanFolder(baseURL, folder, windowURL)
 {
     var url = baseURL+"/LayoutTests/" + folder + "/";
     request('GET', url, function onload(urlIn, html) {
@@ -39,16 +56,17 @@ function scanFolder(folder)
                 var match = href.match(/[^\/]*\/([^\/]+\.html)$/);
                 if (!match)
                     continue;
-                fetchExpectations(baseURL + href);
+                var indexLayoutTests = href.indexOf('/LayoutTests/');
+                fetchExpectations(baseURL + href.substr(indexLayoutTests), windowURL);
             }
         },
-        function onerror(message) {
-          console.error(window.location + ": XHR failed ", message);
+        function onerror(url, message) {
+          console.error(window.location + ": XHR "+url+" failed ", message);
         }
     );
 }
 
-function fetchExpectations(path, callback)
+function fetchExpectations(path, windowURL)
 {
     var testCaseURL = path;
     var ext = path.lastIndexOf(".");
@@ -71,9 +89,9 @@ function fetchExpectations(path, callback)
         var testExpectations = {
             testCaseURL: testCaseURL, 
             expectedURL: url, 
-            expected: filtered.join("\n")
+            expected: filtered.join("\n"),
+            windowURL: windowURL
         };
-        console.log("added "+path);
         window.parent.postMessage(["test", testExpectations], "*");
     }
     
