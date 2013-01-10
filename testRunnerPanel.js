@@ -121,10 +121,11 @@ TestRunnerPanel.attachListeners = function attachListeners() {
     });
 }
 
-function TestModel(testCaseURL, expectedURL, expected) {
+function TestModel(testCaseURL, expectedURL, expected, windowURL) {
     this.url = testCaseURL;
     this.expectedURL = expectedURL;
     this.expected = expected;
+    this.windowURL = windowURL;
 }
 
 function TestView(testModel) {
@@ -431,7 +432,7 @@ function onMessageFromTestScanner(event)
     var method = signature.shift();
     if (method === 'test') {
         var testData = signature[0];
-        var model = new TestModel(testData.testCaseURL, testData.expectedURL, testData.expected);
+        var model = new TestModel(testData.testCaseURL, testData.expectedURL, testData.expected, testData.windowURL);
         var filterText = document.getElementById("filter").value;
         var reFilter = filterText ? new RegExp(filterText) : null;
         if (reFilter) {
