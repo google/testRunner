@@ -276,7 +276,7 @@ TestRunner.prototype = {
 
     _reloadWithTestScripts: function(debug) {
         // This function runs in the DevtoolsExtended window
-        function runInEveryDebuggeeFrame(testURL, jsonSignalTokens) {
+        function runInEveryDebuggeeFrame(testURL, windowURL, jsonSignalTokens) {
             (function(){
                 // This first part runs in every frame, before any other code
                 window.dispatchStandaloneTestRunnerMessages = true;
@@ -339,7 +339,10 @@ TestRunner.prototype = {
                     };
                 }    
                 window.addEventListener('load', function checkForInspector(){
-                    console.log('testRunner found load event in '+window.location);
+                    var path = window.location.pathname;
+                    var matchWindowURL = (path.indexOf(windowURL) !== -1);
+                    console.log('testRunner found load event in ' + path + " and it " + (matchWindowURL ? "matches":" does NOT match") );
+                    
                     if (window.WebInspector) {  // this part only runs in one frame and on load  
                         console.log('testRunner found WebInspector event in '+window.location);
                         
@@ -406,10 +409,11 @@ TestRunner.prototype = {
             // No parameter to notifyDone signals timedout
             this._watchDog = setTimeout(this.notifyDone.bind(this), 10000);
         }
-            
+        
+        var argsAsString = '\"' + this._testModel.url + '\", \"' + this._testModel.windowURL +'\", \'' + JSON.stringify(SignalTokens) + '\'';
         var reloadOptions = {
             ignoreCache: true, 
-            injectedScript:  '(' + runInEveryDebuggeeFrame + '(\"' + this._testModel.url + '\", \'' + JSON.stringify(SignalTokens) + '\')' +')',
+            injectedScript:  '(' + runInEveryDebuggeeFrame + '(' + argsAsString + ')' +')',
           };
         chrome.devtools.inspectedWindow.reload(reloadOptions);
     },
