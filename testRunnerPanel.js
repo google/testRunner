@@ -237,12 +237,17 @@ function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
 var TestRunnerPanel = { 
     tests: [],
 
+    initialize: function() {
+        this.attachListeners();
+        this.restore();
+    },
+
     setFilter: function(value) {
-        document.getElementById("filter").value = value;
+        document.querySelector('.filterValue').value = value;
     },
 
     getFilter: function() {
-        return document.getElementById("filter").value;
+        return document.querySelector('.filterValue').value;
     },
 
     restore: function() {
@@ -550,9 +555,7 @@ window.addEventListener("message", onMessageFromTestScanner, true);
 
 function onload()
 {
-    TestRunnerPanel.attachListeners();
-
-    TestRunnerPanel.restore();
+    TestRunnerPanel.initialize();
 
     var queryParamsObject = {};
     var queryParams = window.location.search;
