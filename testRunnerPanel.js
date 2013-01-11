@@ -235,7 +235,30 @@ function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
 }
 
 var TestRunnerPanel = { 
-    tests: []
+    tests: [],
+
+    setFilter: function(value) {
+        document.getElementById("filter").value = value;
+    },
+
+    getFilter: function() {
+        return document.getElementById("filter").value;
+    },
+
+    restore: function() {
+        var prevParameters = localStorage.getItem('testRunner');
+        if (prevParameters) {
+            prevParameters = JSON.parse(prevParameters);
+            TestRunnerPanel.setFilter(prevParameters.filter);
+        }
+    },
+
+    save: function() {
+        var parameters = {
+            filter: this.getFilter(),
+        };
+        localStorage.setItem('testRunner', JSON.stringify(parameters));
+    }
 };
 
 TestRunnerPanel.loadTests = function loadTests() {
@@ -256,6 +279,8 @@ TestRunnerPanel.loadTests = function loadTests() {
     window.testScannerIframe = document.createElement("iframe");
     window.testScannerIframe.src = scannerServer + "test-scanner.html";
     document.body.appendChild(window.testScannerIframe);
+
+    this.save();
 };
 
 TestRunnerPanel.addTest = function(model) {
@@ -345,7 +370,7 @@ TestView.prototype = {
         var baseEndSentinel = '/inspector/';
         var baseChars = this._testModel.expectedURL.indexOf(baseEndSentinel) + baseEndSentinel.length;
         if (baseChars > 0) 
-            document.getElementById("filter").value = this._testModel.expectedURL.substr(baseChars);
+            TestRunnerPanel.setFilter(this._testModel.expectedURL.substr(baseChars));
     },
 
     _showDiff: function(actual) {
@@ -512,7 +537,7 @@ function onMessageFromTestScanner(event)
     if (method === 'test') {
         var testData = signature[0];
         var model = new TestModel(testData);
-        var filterText = document.getElementById("filter").value;
+        var filterText = TestRunnerPanel.getFilter();
         var reFilter = filterText ? new RegExp(filterText) : null;
         if (reFilter) {
             if (!reFilter.test(model.expectedURL))
@@ -525,7 +550,9 @@ window.addEventListener("message", onMessageFromTestScanner, true);
 
 function onload()
 {
-     TestRunnerPanel.attachListeners();
+    TestRunnerPanel.attachListeners();
+
+    TestRunnerPanel.restore();
 
     var queryParamsObject = {};
     var queryParams = window.location.search;
@@ -537,7 +564,7 @@ function onload()
         queryParamsObject[pair[0]] = pair[1];
     }
     if ("filter" in queryParamsObject)
-        document.getElementById("filter").value = queryParamsObject["filter"];
+        TestRunnerPanel.setFilter(queryParamsObject["filter"]);
 }
 window.addEventListener('load', onload);
 
