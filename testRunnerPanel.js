@@ -194,7 +194,7 @@ function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
     // Test case scripts can use these functions
     window.extensionTestAPI = {
         showPanel: function(named) {
-            console.log("extensionTestAPI: showPanel(" + named + ")");
+            console.log("extensionTestAPI: showPanel(\"" + named + "\")");
         }
     }
 
@@ -233,6 +233,58 @@ function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
     prepareForCommandsFromTestCase();
     window.addEventListener('load', injectIFrameWithTestCase);
 }
+
+var ExtensionTestAPI = {
+    sentinal: "extensionTestAPI: ",
+
+    initialize: function() {
+        this._onMessageAdded = this._onMessageAdded.bind(this);
+        function appendIfDocument(documents, resource) {
+            if (resource.type === 'document')
+                       documents.push(resource.url);
+            return documents;
+        }
+        chrome.devtools.inspectedWindow.getResources(function(resources){
+                this.documents = resources.reduce(appendIfDocument, []);
+                console.log("documents", this.documents);
+                this.devtoolsURL = ""
+                this.documents.some(function(url){
+                    if (url.indexOf('inspector/front-end/devtools.html') !== -1)
+                       return this.devtoolsURL = url;
+                }.bind(this));
+                console.assert(this.devtoolsURL);
+        }.bind(this));
+
+        chrome.devtools.inspectedWindow.onResourceAdded.addListener(function(resource){
+                this.documents = appendIfDocument(this.documents, resource);
+        }.bind(this));
+
+
+    },
+
+    start: function() {
+      chrome.experimental.devtools.console.onMessageAdded.addListener(this._onMessageAdded);  
+    },
+
+    _onMessageAdded: function(event) {
+        if (event.text.indexOf(this.sentinal) === 0) {
+            var cmd = event.text.substr(this.sentinal.length);
+            console.log("ExtensionTestAPI called with ", cmd);
+            var frame = {
+                url: this.devtoolsURL,
+                securityOrigin: ensureOrigin(this.devtoolsURL)
+            }
+            chrome.devtools.inspectedWindow.eval("window.location.href", {frame: frame}, function(value){
+                console.log("inspectedWindow href "+value);
+            });
+        }
+    },
+    stop: function() {
+        chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded);  
+    },     
+}
+
+ExtensionTestAPI.initialize();
 
 var TestRunnerPanel = { 
     tests: [],
@@ -301,6 +353,7 @@ TestRunnerPanel.run = function(debug)
         this.loadTests();
         setTimeout(TestRunnerPanel.run.bind(this, debug), 1000);
     }
+    ExtensionTestAPI.start();
     this.stateRunning()
     this.runTests(debug);
 };
@@ -378,6 +431,7 @@ TestRunnerPanel.runNextTest = function runNextTest(lastResult)
         }
     } 
     delete this.currentTestRunner;
+    ExtensionTestAPI.stop();
     this.stateRan();
 }
 
