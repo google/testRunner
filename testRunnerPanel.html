@@ -9,7 +9,7 @@
 
 <script src='testRunnerPanel.js'></script>
 <body>
-<h1>Querypoint Debugger testRunner</h1>
+<h1>Querypoint Debugger testRunner <span class="state"></span></h1>
 <ul>
 <li>Use Chrome dev channel browser and nodejs</li>
 <li>Start the server for test cases on port 9696: <code>qpp/http/node DAVServer.js</code></li>
@@ -23,14 +23,14 @@
 </ul>
 Filter: <input id="filter" class="filterValue" type="text" size="40"></input><small><i>Click on results to load filter</i></small><br>
 <button class='load'>Load</button>
-<button class='run'>Run</button>
 <button class='debug' >Debug</button>
+<button class='run'>Run</button>
 <button class='interrupt'>Interrupt</button>
 
 
 <span>Passed: <span id="pass">0</span></span>
 <span>Failed: <span id="fail">0</span></span>
-<span>Timeout: <span id="timeout">0</span></span>
+<span>Timeout: <span id="timedout">0</span></span>
 <span>Skipped: <span id="skip">0</span></span>
 <span>Remaining: <span id="remaining">0</span><br>
 

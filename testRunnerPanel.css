@@ -2,6 +2,7 @@
     outline: none;
 }
 
+/* TestView */
 .fail {
     color: red;
 }
@@ -15,10 +16,26 @@
     color: brown;
 }
 
+/* TestRunnerPanel */
  .interrupted .interrupt {
   color:red;
 }
-
+.runningTests .run, .runningTests .debug, .runningTests .load {
+  color: silver;
+}
+.ranTests .run:before, .ranTests .debug:before {
+  content: "Re-";
+}
+.interrupted .state:after {
+  content: "interrupted";
+}
+.ranTests .state:after {
+  content: "done";
+}
+.runningTests .state:after {
+  content: "running";
+}
+ 
 iframe {
     width: 0;
     height: 0;

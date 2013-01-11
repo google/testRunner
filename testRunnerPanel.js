@@ -273,10 +273,9 @@ TestRunnerPanel.loadTests = function loadTests() {
     document.getElementById("pass").textContent = 0;
     document.getElementById("skip").textContent = 0;
     document.getElementById("fail").textContent = 0;
-    document.getElementById("timeout").textContent = 0;
+    document.getElementById("timedout").textContent = 0;
     document.getElementById("remaining").textContent  = 0;
 
-    delete this.currentTestRunner;
     this.tests = [];
 
     if (window.testScannerIframe) 
@@ -292,12 +291,17 @@ TestRunnerPanel.addTest = function(model) {
     var view = new TestView(model);
     this.tests.push({model: model, view: view});
     document.getElementById("remaining").textContent = this.tests.length;
+    if (this.isStateRan())
+        this.stateLoaded();
 }
 
 TestRunnerPanel.run = function(debug)
-{
-    document.body.classList.remove('interrupted');
-
+{  
+    if (this.isStateRan()) {
+        this.loadTests();
+        setTimeout(TestRunnerPanel.run.bind(this, debug), 1000);
+    }
+    this.stateRunning()
     this.runTests(debug);
 };
 
@@ -305,12 +309,52 @@ TestRunnerPanel.runTests = function runTests(debug)
 {
     this.debug = debug;
     this.runNextTest();
+};
+
+TestRunnerPanel.interrupt = function() {
+    this.stateInterrupted();
+    if (this.currentTestRunner) {
+        this.currentTestRunner.interrupt();
+    }
 }
 
-TestRunnerPanel.interrupt = function interrupt()
+/*
+                     +--------------Load/Run/Debug-------+
+                     \/                                               |
+  States: Loaded----Run/Debug---> Running -> Ran  <-+
+                                                       |                        |
+                                                  Interrupt                 |
+                                                      +--> Interrupted +
+ */
+TestRunnerPanel.stateLoaded = function()
+{
+    document.body.classList.remove('ranTests');
+}; 
+
+TestRunnerPanel.stateInterrupted = function()
 {
     document.body.classList.add('interrupted');
-}
+    document.body.classList.remove('runningTests');
+};
+
+TestRunnerPanel.isStateInterrupted = function() {
+    return document.body.classList.contains('interrupted')
+};
+
+TestRunnerPanel.stateRunning = function() {
+    document.body.classList.add('runningTests');
+};
+
+TestRunnerPanel.stateRan = function() {
+    document.body.classList.remove('interrupted');
+    document.body.classList.remove('runningTests');
+    document.body.classList.add('ranTests');  
+};
+
+TestRunnerPanel.isStateRan = function() {
+    return document.body.classList.contains('ranTests')
+};
+
 
 TestRunnerPanel.runNextTest = function runNextTest(lastResult)
 {
@@ -325,14 +369,16 @@ TestRunnerPanel.runNextTest = function runNextTest(lastResult)
             return;
         }
     }
-    if (document.body.classList.contains('interrupted')) {
-        return;
-    }
-    var test = this.tests.shift();
-    if (test) {
-      this.currentTestRunner = new TestRunner(test.model, test.view, runNextTest.bind(this));
-      this.currentTestRunner.run(this.debug);  
-    }
+    if (!this.isStateInterrupted()) {
+        var test = this.tests.shift();
+        if (test) {
+          this.currentTestRunner = new TestRunner(test.model, test.view, runNextTest.bind(this));
+          this.currentTestRunner.run(this.debug);
+          return;  
+        }
+    } 
+    delete this.currentTestRunner;
+    this.stateRan();
 }
 
 TestRunnerPanel.attachListeners = function attachListeners() {
@@ -521,6 +567,10 @@ TestRunner.prototype = {
             injectedScript:  '(' + runInEveryDebuggeeFrame + '(' + argsAsString + ')' +')',
           };
         chrome.devtools.inspectedWindow.reload(reloadOptions);
+    },
+
+    interrupt: function() {
+        this.notifyDone();
     },
 
     notifyDone: function(actual)
