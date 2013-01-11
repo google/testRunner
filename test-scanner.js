@@ -16,6 +16,7 @@ var LayoutTests = [
        ]
     },
     {
+        extension: true,
         windowURL: 'QuerypointDevtoolsPage.html',
         baseURL: "http://localhost:8686/test",
         folders: ["Panel"]
@@ -24,7 +25,7 @@ var LayoutTests = [
 
 LayoutTests.forEach(function(layoutTest){
     layoutTest.folders.forEach(function(folder){
-        scanFolder(layoutTest.baseURL, folder, layoutTest.windowURL);
+        scanFolder(layoutTest.baseURL, folder, layoutTest.windowURL, layoutTest.extension);
     });
 });
 
@@ -44,7 +45,7 @@ function request(method, url, callback, errback) {
 
 var parser = new DOMParser();
 
-function scanFolder(baseURL, folder, windowURL)
+function scanFolder(baseURL, folder, windowURL, extension)
 {
     var url = baseURL+"/LayoutTests/" + folder + "/";
     request('GET', url, function onload(urlIn, html) {
@@ -57,7 +58,7 @@ function scanFolder(baseURL, folder, windowURL)
                 if (!match)
                     continue;
                 var indexLayoutTests = href.indexOf('/LayoutTests/');
-                fetchExpectations(baseURL + href.substr(indexLayoutTests), windowURL);
+                fetchExpectations(baseURL + href.substr(indexLayoutTests), windowURL, extension);
             }
         },
         function onerror(url, message) {
@@ -66,7 +67,7 @@ function scanFolder(baseURL, folder, windowURL)
     );
 }
 
-function fetchExpectations(path, windowURL)
+function fetchExpectations(path, windowURL, extension)
 {
     var testCaseURL = path;
     var ext = path.lastIndexOf(".");
@@ -90,7 +91,8 @@ function fetchExpectations(path, windowURL)
             testCaseURL: testCaseURL, 
             expectedURL: url, 
             expected: filtered.join("\n"),
-            windowURL: windowURL
+            windowURL: windowURL,
+            extension: extension
         };
         window.parent.postMessage(["test", testExpectations], "*");
     }

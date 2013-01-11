@@ -181,6 +181,35 @@ function inspectorTestInjectedScript(testURL, windowURL, jsonSignalTokens) {
     }());
 }
 
+// This function is serialized and runs in every iframe when testing extensions
+function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
+    var path = window.location.pathname;
+    var matchWindowURL = (path.indexOf(windowURL) !== -1);
+    if (!matchWindowURL) 
+        return;
+    console.log("extensionInjectedScript found " + windowURL);
+    var SignalTokens = JSON.parse(jsonSignalTokens);
+ 
+    function prepareForCommandsFromTestCase() {
+        function onMessage(event) {
+            console.log("TestCase sent ", event);
+        }
+        window.addEventListener('message', onMessage);
+        console.log("ready for iframe messages")    
+    }
+    
+    function injectIFrameWithTestCase() {
+        var iframe = document.createElement('iframe');
+        iframe.setAttribute('style', 'width:0;height:0;opacity:0');
+        document.body.appendChild(iframe);
+        iframe.src = testURL;
+        console.log("added iframe at "+testURL)
+    }
+
+    prepareForCommandsFromTestCase();
+    window.addEventListener('load', injectIFrameWithTestCase);
+}
+
 var TestRunnerPanel = { 
     tests: []
 };
@@ -266,11 +295,12 @@ TestRunnerPanel.attachListeners = function attachListeners() {
     });
 }
 
-function TestModel(testCaseURL, expectedURL, expected, windowURL) {
-    this.url = testCaseURL;
-    this.expectedURL = expectedURL;
-    this.expected = expected;
-    this.windowURL = windowURL;
+function TestModel(testData) {
+    this.url = testData.testCaseURL;
+    this.expectedURL = testData.expectedURL;
+    this.expected = testData.expected;
+    this.windowURL = testData.windowURL;
+    this.extension = testData.extension;
 }
 
 function TestView(testModel) {
@@ -420,7 +450,11 @@ TestRunner.prototype = {
     },
 
     _reloadWithTestScripts: function(debug) {
+
        var runInEveryDebuggeeFrame = inspectorTestInjectedScript;
+       if (this._testModel.extension) {
+            runInEveryDebuggeeFrame = extensionInjectedScript;
+       }
 
         if (!debug)  {
             // No parameter to notifyDone signals timedout
@@ -453,7 +487,7 @@ function onMessageFromTestScanner(event)
     var method = signature.shift();
     if (method === 'test') {
         var testData = signature[0];
-        var model = new TestModel(testData.testCaseURL, testData.expectedURL, testData.expected, testData.windowURL);
+        var model = new TestModel(testData);
         var filterText = document.getElementById("filter").value;
         var reFilter = filterText ? new RegExp(filterText) : null;
         if (reFilter) {
