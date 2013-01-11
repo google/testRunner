@@ -187,12 +187,36 @@ function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
     var matchWindowURL = (path.indexOf(windowURL) !== -1);
     if (!matchWindowURL) 
         return;
+
     console.log("extensionInjectedScript found " + windowURL);
     var SignalTokens = JSON.parse(jsonSignalTokens);
- 
+
+    // Test case scripts can use these functions
+    window.extensionTestAPI = {
+        showPanel: function(named) {
+            console.log("extensionTestAPI: showPanel(" + named + ")");
+        }
+    }
+
+    var testMediator = {
+        evaluateForTest: function(callId, script) {
+            script += '\n//@ sourceURL=extensionTest' + callId + '.js';
+            window.eval(script);
+        }
+    };
+    
     function prepareForCommandsFromTestCase() {
+        function dispatchMessage(data) {
+            var method = data.shift();
+            var args = data;
+            testMediator[method].apply(testMediator, args);
+            console.log("called testMediator "+method, args);
+        }
         function onMessage(event) {
-            console.log("TestCase sent ", event);
+            if (testURL.indexOf(event.origin) === 0) {
+                console.log("TestCase sent ", event);
+                dispatchMessage(event.data);
+            }
         }
         window.addEventListener('message', onMessage);
         console.log("ready for iframe messages")    
