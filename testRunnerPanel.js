@@ -198,36 +198,84 @@ function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
             
         if (path.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1) {
             console.log("extensionInjectedScript found devtools at " + path);
+            (function(){
+                function injectMutationSummary() {
+                    window.removeEventListener('load', injectMutationSummary);
+                    var script = document.createElement('script');
+                    script.src = "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/mutation-summary/mutation_summary.js";
+                    script.onload = function() {
+                        console.log(script.src + " script loaded and ready");
+                    };
+                    document.getElementsByTagName('head')[0].appendChild(script);
+                }
+                // We cannot inject during reload injection, crashes extension.
+                window.addEventListener('load', injectMutationSummary);
+            }())
             window[SignalTokens.EXTENSION_API] = {
-                querySelectorAll: function(selector) {
+                debug: true,
+                textSelectorAll: function(nodes, textContent) {
+                       return nodes.reduce(function findTextMatching(nodes, node) {
+                            if (node.textContent.indexOf(textContent) !== -1)
+                                nodes.push(node);
+                            return nodes;
+                        }, []);
+                }, 
+                querySelectorAll: function(selector, textContent) {
                     var nodeList = document.querySelectorAll(selector);
-                    var arry = [];
+                    var nodes = [];
                     for (var i = 0; i < nodeList.length; i++) {
-                        arry.push(nodeList[i]);
+                        nodes.push(nodeList[i]);
+                    }
+                    if (this.debug) 
+                        console.log("querySelectorAll finds "+nodes.length+" matches for "+selector);
+                    if (textContent) {
+                        nodes = this.textSelectorAll(nodes, textContent);
+                        if (this.debug)
+                            console.log("querySelectorAll finds "+nodes.length+" matches for "+selector+" with text "+textContent);
                     } 
-                    return arry;
+                    return nodes;
+                },
+                whenSelectorHits: function(textContent, callback, responses) {
+                    var addedElements = responses[0].added;
+                    var hits = this.textSelectorAll(addedElements, textContent);
+                    if (hits.length)
+                        callback(hits);
+                },
+                whenSelectorAll: function(selector, textContent, callback) {
+                    var availableNodes = this.querySelectorAll(selector, textContent);
+                    if (availableNodes.length) {
+                        callback(availableNodes);
+                    } else {
+                        if (this.debug)
+                            console.log("whenSelectorAll waiting for " + selector + " with text "+textContent);
+                        var observer;
+                        function disconnectOnFind(hits) {
+                            observer.disconnect();
+                            callback(hits);
+                        }
+                        observer = new MutationSummary({
+                            callback: this.whenSelectorHits.bind(this, textContent, disconnectOnFind),
+                            queries: [
+                                {element: selector}
+                            ]
+                        });
+                    } 
                 },
                 click: function(elt) {
                     var event = document.createEvent("MouseEvent");
                     event.initMouseEvent("click", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
                     elt.dispatchEvent(event);
                 },
+                clickSelector: function(args) {
+                    var selector = args['0'];
+                    var textContent = args['1'];
+                    this.whenSelectorAll(selector, textContent, function(hits) {
+                        this.click(hits[0]);
+                    }.bind(this));
+                },
                 showPanel: function(named) {
                     console.log(window.location.pathname + " showPanel " + named);
-                    var panel;
-                    var panelNames = [];
-                    this.querySelectorAll('button div.toolbar-label').some(function(div){
-                        if (div.textContent===named) {
-                            panel = div;
-                            return true;
-                        }
-                        panelNames.push(div.textContent);
-                    });
-                    if (panel) {
-                        this.click(panel);
-                        return "clicked "+named;
-                    }
-                    return "No panel named " + named + " in " + panelNames.join(',')
+                    this.clickSelector('div.toolbar-label', named);
                 }
             };
             console.log("extensionInjectedScript added " + SignalTokens.EXTENSION_API, window[SignalTokens.EXTENSION_API]);
@@ -239,9 +287,9 @@ function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
     
     // Test case scripts can use these functions
     window.extensionTestAPI = {
-        showPanel: function(named) {
+        clickSelector: function(selector, textContent) {
             // call back to testRunner's ExtensionTestProxy
-            console.log(SignalTokens.EXTENSION_API +".showPanel(\"" + named + "\")");
+            console.log(SignalTokens.EXTENSION_API +'.clickSelector(' + JSON.stringify(arguments) + ')'); 
         }
     }
 
