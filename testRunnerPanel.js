@@ -1,5 +1,3 @@
-
-var layoutTestsServer = "http://localhost:8002/";
 var scannerServer = "./";
 
 var tests = [];
@@ -35,6 +33,14 @@ var skipList = [
     "inspector/profiler/heap-snapshot-inspect-dom-wrapper.html",
     "inspector/timeline/timeline-network-received-data.html",
 ];
+
+var SignalTokens = {
+    COMPLETE: "InspectorTest.testComplete: ",
+    RESULT: "InspectorTest.addResult: ",
+    CLEAR: "InspectorTest.clearResults: ",
+    EXTENSION_API: "ExtensionTestAPI",
+    DEVTOOLS_PATH: 'inspector/front-end/devtools.html'
+};
 
 // This function is serialized and runs in the DevtoolsExtended window
 function inspectorTestInjectedScript(testURL, windowURL, jsonSignalTokens) {
@@ -183,18 +189,59 @@ function inspectorTestInjectedScript(testURL, windowURL, jsonSignalTokens) {
 
 // This function is serialized and runs in every iframe when testing extensions
 function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
-    var path = window.location.pathname;
-    var matchWindowURL = (path.indexOf(windowURL) !== -1);
-    if (!matchWindowURL) 
-        return;
-
-    console.log("extensionInjectedScript found " + windowURL);
     var SignalTokens = JSON.parse(jsonSignalTokens);
 
+    var path = window.location.pathname;
+    var matchWindowURL = (path.indexOf(windowURL) !== -1);
+    if (!matchWindowURL) {
+        console.log("extensionInjectedScript looking for devtools at " + path);
+            
+        if (path.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1) {
+            console.log("extensionInjectedScript found devtools at " + path);
+            window[SignalTokens.EXTENSION_API] = {
+                querySelectorAll: function(selector) {
+                    var nodeList = document.querySelectorAll(selector);
+                    var arry = [];
+                    for (var i = 0; i < nodeList.length; i++) {
+                        arry.push(nodeList[i]);
+                    } 
+                    return arry;
+                },
+                click: function(elt) {
+                    var event = document.createEvent("MouseEvent");
+                    event.initMouseEvent("click", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+                    elt.dispatchEvent(event);
+                },
+                showPanel: function(named) {
+                    console.log(window.location.pathname + " showPanel " + named);
+                    var panel;
+                    var panelNames = [];
+                    this.querySelectorAll('button div.toolbar-label').some(function(div){
+                        if (div.textContent===named) {
+                            panel = div;
+                            return true;
+                        }
+                        panelNames.push(div.textContent);
+                    });
+                    if (panel) {
+                        this.click(panel);
+                        return "clicked "+named;
+                    }
+                    return "No panel named " + named + " in " + panelNames.join(',')
+                }
+            };
+            console.log("extensionInjectedScript added " + SignalTokens.EXTENSION_API, window[SignalTokens.EXTENSION_API]);
+        }
+        return;
+    }
+
+    console.log("extensionInjectedScript found " + windowURL);
+    
     // Test case scripts can use these functions
     window.extensionTestAPI = {
         showPanel: function(named) {
-            console.log("extensionTestAPI: showPanel(\"" + named + "\")");
+            // call back to testRunner's ExtensionTestProxy
+            console.log(SignalTokens.EXTENSION_API +".showPanel(\"" + named + "\")");
         }
     }
 
@@ -234,8 +281,14 @@ function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
     window.addEventListener('load', injectIFrameWithTestCase);
 }
 
-var ExtensionTestAPI = {
-    sentinal: "extensionTestAPI: ",
+/*
+ * JS injected into an extension iframe can call for operations in WebInspector by 
+ * writing a special string to the console. We monitor the console for these strings
+ * and evaluate into the appropriate iframe.
+ */
+var ExtensionTestProxy = {
+
+    sentinal: SignalTokens.EXTENSION_API,
 
     initialize: function() {
         this._onMessageAdded = this._onMessageAdded.bind(this);
@@ -249,7 +302,7 @@ var ExtensionTestAPI = {
                 console.log("documents", this.documents);
                 this.devtoolsURL = ""
                 this.documents.some(function(url){
-                    if (url.indexOf('inspector/front-end/devtools.html') !== -1)
+                    if (url.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1)
                        return this.devtoolsURL = url;
                 }.bind(this));
                 console.assert(this.devtoolsURL);
@@ -268,14 +321,14 @@ var ExtensionTestAPI = {
 
     _onMessageAdded: function(event) {
         if (event.text.indexOf(this.sentinal) === 0) {
-            var cmd = event.text.substr(this.sentinal.length);
-            console.log("ExtensionTestAPI called with ", cmd);
+            var cmd = event.text;
+            console.log("ExtensionTestProxy called with ", cmd);
             var frame = {
                 url: this.devtoolsURL,
                 securityOrigin: ensureOrigin(this.devtoolsURL)
             }
-            chrome.devtools.inspectedWindow.eval("window.location.href", {frame: frame}, function(value){
-                console.log("inspectedWindow href "+value);
+            chrome.devtools.inspectedWindow.eval(cmd, {frame: frame}, function(value, isException){
+                console.log(cmd + ": " + value + " isException: " + isException);
             });
         }
     },
@@ -284,7 +337,7 @@ var ExtensionTestAPI = {
     },     
 }
 
-ExtensionTestAPI.initialize();
+ExtensionTestProxy.initialize();
 
 var TestRunnerPanel = { 
     tests: [],
@@ -353,7 +406,7 @@ TestRunnerPanel.run = function(debug)
         this.loadTests();
         setTimeout(TestRunnerPanel.run.bind(this, debug), 1000);
     }
-    ExtensionTestAPI.start();
+    ExtensionTestProxy.start();
     this.stateRunning()
     this.runTests(debug);
 };
@@ -431,7 +484,7 @@ TestRunnerPanel.runNextTest = function runNextTest(lastResult)
         }
     } 
     delete this.currentTestRunner;
-    ExtensionTestAPI.stop();
+    ExtensionTestProxy.stop();
     this.stateRan();
 }
 
@@ -557,12 +610,6 @@ function TestRunner(testModel,  testView, next)
     this._pendingMessages = [];
     this._onMessageAdded = this._onMessageAdded.bind(this);
 }
-
-var SignalTokens = {
-    COMPLETE: "InspectorTest.testComplete: ",
-    RESULT: "InspectorTest.addResult: ",
-    CLEAR: "InspectorTest.clearResults: ",
-};
 
 TestRunner.prototype = {
 
