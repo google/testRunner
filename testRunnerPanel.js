@@ -38,12 +38,14 @@ var SignalTokens = {
     COMPLETE: "InspectorTest.testComplete: ",
     RESULT: "InspectorTest.addResult: ",
     CLEAR: "InspectorTest.clearResults: ",
-    EXTENSION_API: "ExtensionTestAPI",
+    PATIENT_SELECTOR: "PatientSelectorAPI",
+    DEVTOOLS_WINDOW: "DevtoolsWindowTestAPI",
+    EXTENSION_WINDOW: "ExtensionWindowTestAPI",
     DEVTOOLS_PATH: 'inspector/front-end/devtools.html'
 };
 
 // This function is serialized and runs in the DevtoolsExtended window
-function inspectorTestInjectedScript(testURL, windowURL, jsonSignalTokens) {
+function inspectorTestInjectedScript(testURL, testParentURL, jsonSignalTokens) {
     (function(){
         // This first part runs in every frame, before any other code
         window.dispatchStandaloneTestRunnerMessages = true;
@@ -167,19 +169,19 @@ function inspectorTestInjectedScript(testURL, windowURL, jsonSignalTokens) {
             }
 
             var path = window.location.pathname;
-            var matchWindowURL = (path.indexOf(windowURL) !== -1);
-             console.log('testRunner found load event in ' + path + " and it " + (matchWindowURL ? "matches":" does NOT match") );
+            var matchTestParentURL = (path.indexOf(testParentURL) !== -1);
+             console.log('testRunner found load event in ' + path + " and it " + (matchTestParentURL ? "matches":" does NOT match") );
             
             if (window.WebInspector) {  // this part only runs in one frame and on load  
                 console.log('testRunner found WebInspector event in '+window.location);
                 monkeyPatch();
-                if (matchWindowURL) {  // then we are testing devtools and we need to wait longer
+                if (matchTestParentURL) {  // then we are testing devtools and we need to wait longer
                     WebInspector.notifications.addEventListener('InspectorLoaded', addTestFrame(testURL));
                 } else { //  we are testing an extension
                     delete window.opener;
                 }
             } else {
-                if (matchWindowURL) {
+                if (matchTestParentURL) {
                     addTestFrame(testURL)();
                 }
             }
@@ -188,145 +190,135 @@ function inspectorTestInjectedScript(testURL, windowURL, jsonSignalTokens) {
 }
 
 // This function is serialized and runs in every iframe when testing extensions
-function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
+function extensionInjectedScript(testURL, testParentURL, jsonSignalTokens) {
     var SignalTokens = JSON.parse(jsonSignalTokens);
-
+    
     var path = window.location.pathname;
-    var matchWindowURL = (path.indexOf(windowURL) !== -1);
-    if (!matchWindowURL) {
-        console.log("extensionInjectedScript looking for devtools at " + path);
-            
-        if (path.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1) {
-            console.log("extensionInjectedScript found devtools at " + path);
-            (function(){
-                function injectMutationSummary() {
-                    window.removeEventListener('load', injectMutationSummary);
-                    var script = document.createElement('script');
-                    script.src = "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/mutation-summary/mutation_summary.js";
-                    script.onload = function() {
-                        console.log(script.src + " script loaded and ready");
-                    };
-                    document.getElementsByTagName('head')[0].appendChild(script);
-                }
-                // We cannot inject during reload injection, crashes extension.
-                window.addEventListener('load', injectMutationSummary);
-            }())
-            window[SignalTokens.EXTENSION_API] = {
-                debug: true,
-                textSelectorAll: function(nodes, textContent) {
-                       return nodes.reduce(function findTextMatching(nodes, node) {
-                            if (node.textContent.indexOf(textContent) !== -1)
-                                nodes.push(node);
-                            return nodes;
-                        }, []);
-                }, 
-                querySelectorAll: function(selector, textContent) {
-                    var nodeList = document.querySelectorAll(selector);
-                    var nodes = [];
-                    for (var i = 0; i < nodeList.length; i++) {
-                        nodes.push(nodeList[i]);
-                    }
-                    if (this.debug) 
-                        console.log("querySelectorAll finds "+nodes.length+" matches for "+selector);
-                    if (textContent) {
-                        nodes = this.textSelectorAll(nodes, textContent);
-                        if (this.debug)
-                            console.log("querySelectorAll finds "+nodes.length+" matches for "+selector+" with text "+textContent);
-                    } 
-                    return nodes;
-                },
-                whenSelectorHits: function(textContent, callback, responses) {
-                    var addedElements = responses[0].added;
-                    var hits = this.textSelectorAll(addedElements, textContent);
-                    if (hits.length)
-                        callback(hits);
-                },
-                whenSelectorAll: function(selector, textContent, callback) {
-                    var availableNodes = this.querySelectorAll(selector, textContent);
-                    if (availableNodes.length) {
-                        callback(availableNodes);
-                    } else {
-                        if (this.debug)
-                            console.log("whenSelectorAll waiting for " + selector + " with text "+textContent);
-                        var observer;
-                        function disconnectOnFind(hits) {
-                            observer.disconnect();
-                            callback(hits);
-                        }
-                        observer = new MutationSummary({
-                            callback: this.whenSelectorHits.bind(this, textContent, disconnectOnFind),
-                            queries: [
-                                {element: selector}
-                            ]
-                        });
-                    } 
-                },
-                click: function(elt) {
-                    var event = document.createEvent("MouseEvent");
-                    event.initMouseEvent("click", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
-                    elt.dispatchEvent(event);
-                },
-                clickSelector: function(args) {
-                    var selector = args['0'];
-                    var textContent = args['1'];
-                    this.whenSelectorAll(selector, textContent, function(hits) {
-                        this.click(hits[0]);
-                    }.bind(this));
-                },
-                showPanel: function(named) {
-                    console.log(window.location.pathname + " showPanel " + named);
-                    this.clickSelector('div.toolbar-label', named);
-                }
+    var matchTestParentURL = (path.indexOf(testParentURL) !== -1);       
+    var matchDevtoolsURL = (path.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1);
+
+    if (!matchDevtoolsURL && !matchTestParentURL)
+        return; 
+    
+    (function(){
+        function injectMutationSummary() {
+            window.removeEventListener('load', injectMutationSummary);
+            var script = document.createElement('script');
+            script.src = "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/mutation-summary/mutation_summary.js";
+            script.onload = function() {
+                console.log(script.src + " script loaded and ready");
             };
-            console.log("extensionInjectedScript added " + SignalTokens.EXTENSION_API, window[SignalTokens.EXTENSION_API]);
+            document.getElementsByTagName('head')[0].appendChild(script);
         }
-        return;
-    }
+        // We cannot inject during reload injection, crashes extension.
+        window.addEventListener('load', injectMutationSummary);
+    }());
 
-    console.log("extensionInjectedScript found " + windowURL);
-    
-    // Test case scripts can use these functions
-    window.extensionTestAPI = {
-        clickSelector: function(selector, textContent) {
-            // call back to testRunner's ExtensionTestProxy
-            console.log(SignalTokens.EXTENSION_API +'.clickSelector(' + JSON.stringify(arguments) + ')'); 
-        }
-    }
-
-    var testMediator = {
-        evaluateForTest: function(callId, script) {
-            script += '\n//@ sourceURL=extensionTest' + callId + '.js';
-            window.eval(script);
-        }
-    };
-    
-    function prepareForCommandsFromTestCase() {
-        function dispatchMessage(data) {
-            var method = data.shift();
-            var args = data;
-            testMediator[method].apply(testMediator, args);
-            console.log("called testMediator "+method, args);
-        }
-        function onMessage(event) {
-            if (testURL.indexOf(event.origin) === 0) {
-                console.log("TestCase sent ", event);
-                dispatchMessage(event.data);
+    window[SignalTokens.PATIENT_SELECTOR] = {
+        debug: true,
+        textSelectorAll: function(nodes, textContent) {
+               return nodes.reduce(function findTextMatching(nodes, node) {
+                    if (node.textContent.indexOf(textContent) !== -1)
+                        nodes.push(node);
+                    return nodes;
+                }, []);
+        }, 
+        querySelectorAll: function(selector, textContent) {
+            var nodeList = document.querySelectorAll(selector);
+            var nodes = [];
+            for (var i = 0; i < nodeList.length; i++) {
+                nodes.push(nodeList[i]);
             }
-        }
-        window.addEventListener('message', onMessage);
-        console.log("ready for iframe messages")    
-    }
-    
-    function injectIFrameWithTestCase() {
-        var iframe = document.createElement('iframe');
-        iframe.setAttribute('style', 'width:0;height:0;opacity:0');
-        document.body.appendChild(iframe);
-        iframe.src = testURL;
-        console.log("added iframe at "+testURL)
-    }
+            if (this.debug) 
+                console.log("querySelectorAll finds "+nodes.length+" matches for "+selector);
+            if (textContent) {
+                nodes = this.textSelectorAll(nodes, textContent);
+                if (this.debug)
+                    console.log("querySelectorAll finds "+nodes.length+" matches for "+selector+" with text "+textContent);
+            } 
+            return nodes;
+        },
+        whenSelectorHits: function(textContent, callback, responses) {
+            var addedElements = responses[0].added;
+            var hits = this.textSelectorAll(addedElements, textContent);
+            if (hits.length)
+                callback(hits);
+        },
+        whenSelectorAll: function(selector, textContent, callback) {
+            var availableNodes = this.querySelectorAll(selector, textContent);
+            if (availableNodes.length) {
+                callback(availableNodes);
+            } else {
+                if (this.debug)
+                    console.log("whenSelectorAll waiting for " + selector + " with text "+textContent);
+                var observer;
+                function disconnectOnFind(hits) {
+                    observer.disconnect();
+                    if (this.debug)
+                        console.log("whenSelectorAll found "+hits.length +" for " + selector + " with text "+textContent);
+                    callback(hits);
+                }
+                observer = new MutationSummary({
+                    callback: this.whenSelectorHits.bind(this, textContent, disconnectOnFind),
+                    queries: [
+                        {element: selector}
+                    ]
+                });
+            } 
+        },
+        click: function(elt) {
+            var event = document.createEvent("MouseEvent");
+            event.initMouseEvent("click", true, true, window, 0, 0, 0, 0, 0, false, false, false, false, 0, null);
+            elt.dispatchEvent(event);
+        },
+        clickSelector: function(args) {
+            var selector = args['0'];
+            var textContent = args['1'];
+            this.whenSelectorAll(selector, textContent, function(hits) {
+                this.click(hits[0]);
+            }.bind(this));
+        },
+    };
+    console.log("extensionInjectedScript added " + SignalTokens.PATIENT_SELECTOR, window[SignalTokens.PATIENT_SELECTOR]);
 
-    prepareForCommandsFromTestCase();
-    window.addEventListener('load', injectIFrameWithTestCase);
+    if (matchTestParentURL) {
+        console.log("extensionInjectedScript found parent of test case iframe " + testParentURL);
+
+        var testMediator = {
+            evaluateForTest: function(callId, script) {
+                script += '\n//@ sourceURL=extensionTest' + callId + '.js';
+                window.eval(script);
+            }
+        };
+        
+        function prepareForCommandsFromTestCase() {
+            function dispatchMessage(data) {
+                var method = data.shift();
+                var args = data;
+                testMediator[method].apply(testMediator, args);
+                console.log("called testMediator "+method, args);
+            }
+            function onMessage(event) {
+                if (testURL.indexOf(event.origin) === 0) {
+                    console.log("TestCase sent ", event);
+                    dispatchMessage(event.data);
+                }
+            }
+            window.addEventListener('message', onMessage);
+            console.log("ready for iframe messages")    
+        }
+        
+        function injectIFrameWithTestCase() {
+            var iframe = document.createElement('iframe');
+            iframe.setAttribute('style', 'width:0;height:0;opacity:0');
+            document.body.appendChild(iframe);
+            iframe.src = testURL;
+            console.log("added iframe at "+testURL)
+        }
+
+        prepareForCommandsFromTestCase();
+        window.addEventListener('load', injectIFrameWithTestCase);
+    }
 }
 
 /*
@@ -336,9 +328,7 @@ function extensionInjectedScript(testURL, windowURL, jsonSignalTokens) {
  */
 var ExtensionTestProxy = {
 
-    sentinal: SignalTokens.EXTENSION_API,
-
-    initialize: function() {
+      initialize: function() {
         this._onMessageAdded = this._onMessageAdded.bind(this);
         function appendIfDocument(documents, resource) {
             if (resource.type === 'document')
@@ -363,17 +353,23 @@ var ExtensionTestProxy = {
 
     },
 
-    start: function() {
-      chrome.experimental.devtools.console.onMessageAdded.addListener(this._onMessageAdded);  
+    start: function(testParentURL) {
+      this.testParentURL = testParentURL; // bah members
+      chrome.experimental.devtools.console.onMessageAdded.addListener(this._onMessageAdded);
+      console.log("ExtensionTestProxy start");  
     },
 
     _onMessageAdded: function(event) {
-        if (event.text.indexOf(this.sentinal) === 0) {
-            var cmd = event.text;
+        if (event.text.indexOf(SignalTokens.PATIENT_SELECTOR + '@') === 0) {
+            var cmd = event.text.substr(SignalTokens.PATIENT_SELECTOR.length + 1);
+            var targetWindowURL = this.testParentURL;
+            if (cmd.indexOf(SignalTokens.DEVTOOLS_WINDOW)) {
+                targetWindowURL = this.devtoolsURL;
+            }
             console.log("ExtensionTestProxy called with ", cmd);
             var frame = {
-                url: this.devtoolsURL,
-                securityOrigin: ensureOrigin(this.devtoolsURL)
+                url: targetWindowURL,
+                securityOrigin: ensureOrigin(targetWindowURL)
             }
             chrome.devtools.inspectedWindow.eval(cmd, {frame: frame}, function(value, isException){
                 console.log(cmd + ": " + value + " isException: " + isException);
@@ -381,7 +377,8 @@ var ExtensionTestProxy = {
         }
     },
     stop: function() {
-        chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded);  
+        chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded); 
+        console.log("ExtensionTestProxy stop");   
     },     
 }
 
@@ -454,7 +451,6 @@ TestRunnerPanel.run = function(debug)
         this.loadTests();
         setTimeout(TestRunnerPanel.run.bind(this, debug), 1000);
     }
-    ExtensionTestProxy.start();
     this.stateRunning()
     this.runTests(debug);
 };
@@ -532,7 +528,6 @@ TestRunnerPanel.runNextTest = function runNextTest(lastResult)
         }
     } 
     delete this.currentTestRunner;
-    ExtensionTestProxy.stop();
     this.stateRan();
 }
 
@@ -554,7 +549,7 @@ function TestModel(testData) {
     this.url = testData.testCaseURL;
     this.expectedURL = testData.expectedURL;
     this.expected = testData.expected;
-    this.windowURL = testData.windowURL;
+    this.testParentURL = testData.testParentURL;
     this.extension = testData.extension;
 }
 
@@ -674,7 +669,7 @@ TestRunner.prototype = {
                 return;
             }
         }
-
+        ExtensionTestProxy.start(this._testModel.testParentURL);
         this._testView.running();
         this._listenForResults();
         this._reloadWithTestScripts(debug);
@@ -710,7 +705,7 @@ TestRunner.prototype = {
             this._watchDog = setTimeout(this.notifyDone.bind(this), 10000);
         }
         
-        var argsAsString = '\"' + this._testModel.url + '\", \"' + this._testModel.windowURL +'\", \'' + JSON.stringify(SignalTokens) + '\'';
+        var argsAsString = '\"' + this._testModel.url + '\", \"' + this._testModel.testParentURL +'\", \'' + JSON.stringify(SignalTokens) + '\'';
         var reloadOptions = {
             ignoreCache: true, 
             injectedScript:  '(' + runInEveryDebuggeeFrame + '(' + argsAsString + ')' +')',
@@ -726,7 +721,8 @@ TestRunner.prototype = {
     {
         if (TestRunnerPanel.debugDiffs) console.log("actual", this.actual);
         chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded); 
-        clearTimeout(this._watchDog);   
+        clearTimeout(this._watchDog);
+        ExtensionTestProxy.stop();
         var pass = this._testView.update(this.actual);    
         this._next(pass);
     },

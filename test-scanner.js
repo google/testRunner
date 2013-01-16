@@ -1,7 +1,7 @@
 
 var LayoutTests = [
     {
-        windowURL: 'devtools.html',
+        testParentURL: 'devtools.html',
         baseURL:  "http://localhost:9696",
         folders: [
             "inspector/console",
@@ -17,7 +17,7 @@ var LayoutTests = [
     },
     {
         extension: true,
-        windowURL: 'QuerypointDevtoolsPage.html',
+        testParentURL: 'QuerypointDevtoolsPage.html',
         baseURL: "http://localhost:8686/test",
         folders: ["Panel"]
     }
@@ -25,7 +25,7 @@ var LayoutTests = [
 
 LayoutTests.forEach(function(layoutTest){
     layoutTest.folders.forEach(function(folder){
-        scanFolder(layoutTest.baseURL, folder, layoutTest.windowURL, layoutTest.extension);
+        scanFolder(layoutTest.baseURL, folder, layoutTest.testParentURL, layoutTest.extension);
     });
 });
 
@@ -45,7 +45,7 @@ function request(method, url, callback, errback) {
 
 var parser = new DOMParser();
 
-function scanFolder(baseURL, folder, windowURL, extension)
+function scanFolder(baseURL, folder, testParentURL, extension)
 {
     var url = baseURL+"/LayoutTests/" + folder + "/";
     request('GET', url, function onload(urlIn, html) {
@@ -58,7 +58,7 @@ function scanFolder(baseURL, folder, windowURL, extension)
                 if (!match)
                     continue;
                 var indexLayoutTests = href.indexOf('/LayoutTests/');
-                fetchExpectations(baseURL + href.substr(indexLayoutTests), windowURL, extension);
+                fetchExpectations(baseURL + href.substr(indexLayoutTests), testParentURL, extension);
             }
         },
         function onerror(url, message) {
@@ -67,7 +67,7 @@ function scanFolder(baseURL, folder, windowURL, extension)
     );
 }
 
-function fetchExpectations(path, windowURL, extension)
+function fetchExpectations(path, testParentURL, extension)
 {
     var testCaseURL = path;
     var ext = path.lastIndexOf(".");
@@ -91,7 +91,7 @@ function fetchExpectations(path, windowURL, extension)
             testCaseURL: testCaseURL, 
             expectedURL: url, 
             expected: filtered.join("\n"),
-            windowURL: windowURL,
+            testParentURL: testParentURL,
             extension: extension
         };
         window.parent.postMessage(["test", testExpectations], "*");
