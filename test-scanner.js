@@ -16,6 +16,13 @@ var LayoutTests = [
        ]
     },
     {
+        testParentURL: 'devtools.html',
+        baseURL:  "http://127.0.0.1:8000",
+        folders: [
+            "http/tests/inspector",
+       ]
+    },
+    {
         extension: true,
         testParentURL: 'QuerypointDevtoolsPage.html',
         baseURL: "http://localhost:8686/test",
