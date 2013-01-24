@@ -45,6 +45,7 @@ var SignalTokens = {
 };
 
 // This function is serialized and runs in the DevtoolsExtended window
+// to support WebKit LayoutTests for WebInspector
 function inspectorTestInjectedScript(testURL, testParentURL, jsonSignalTokens) {
     (function(){
         // This first part runs in every frame, before any other code
@@ -190,6 +191,8 @@ function inspectorTestInjectedScript(testURL, testParentURL, jsonSignalTokens) {
 }
 
 // This function is serialized and runs in every iframe when testing extensions
+// only. We test the window.location to add API only to the window being tested 
+// and to the main WebInspetor window.
 function extensionInjectedScript(testURL, testParentURL, jsonSignalTokens) {
     var SignalTokens = JSON.parse(jsonSignalTokens);
     
@@ -210,20 +213,20 @@ function extensionInjectedScript(testURL, testParentURL, jsonSignalTokens) {
             };
             document.getElementsByTagName('head')[0].appendChild(script);
         }
-        // We cannot inject during reload injection, crashes extension.
-        window.addEventListener('load', injectMutationSummary);
+        // We cannot inject during reload-injection, crashes extension.
+        window.addEventListener('DOMContentLoaded', injectMutationSummary);
     }());
 
     window[SignalTokens.PATIENT_SELECTOR] = {
         debug: true,
-        textSelectorAll: function(nodes, textContent) {
+        textSelectorAll: function(nodes, textToMatch) {
                return nodes.reduce(function findTextMatching(nodes, node) {
-                    if (node.textContent.indexOf(textContent) !== -1)
+                    if (node.textContent.indexOf(textToMatch) !== -1)
                         nodes.push(node);
                     return nodes;
                 }, []);
         }, 
-        querySelectorAll: function(selector, textContent) {
+        querySelectorAll: function(selector, textToMatch) {
             var nodeList = document.querySelectorAll(selector);
             var nodes = [];
             for (var i = 0; i < nodeList.length; i++) {
@@ -231,35 +234,35 @@ function extensionInjectedScript(testURL, testParentURL, jsonSignalTokens) {
             }
             if (this.debug) 
                 console.log("querySelectorAll finds "+nodes.length+" matches for "+selector);
-            if (textContent) {
-                nodes = this.textSelectorAll(nodes, textContent);
+            if (textToMatch) {
+                nodes = this.textSelectorAll(nodes, textToMatch);
                 if (this.debug)
-                    console.log("querySelectorAll finds "+nodes.length+" matches for "+selector+" with text "+textContent);
+                    console.log("querySelectorAll finds "+nodes.length+" matches for "+selector+" with text "+textToMatch);
             } 
             return nodes;
         },
-        whenSelectorHits: function(textContent, callback, responses) {
-            var addedElements = responses[0].added;
-            var hits = this.textSelectorAll(addedElements, textContent);
+        whenSelectorHits: function(textToMatch, callback, mutationSummary) {
+            var addedElements = mutationSummary[0].added;
+            var hits = this.textSelectorAll(addedElements, textToMatch);
             if (hits.length)
                 callback(hits);
         },
-        whenSelectorAll: function(selector, textContent, callback) {
-            var availableNodes = this.querySelectorAll(selector, textContent);
+        whenSelectorAll: function(selector, textToMatch, callback) {
+            var availableNodes = this.querySelectorAll(selector, textToMatch);
             if (availableNodes.length) {
                 callback(availableNodes);
             } else {
                 if (this.debug)
-                    console.log("whenSelectorAll waiting for " + selector + " with text "+textContent);
+                    console.log("whenSelectorAll waiting for " + selector + " with text "+textToMatch);
                 var observer;
                 function disconnectOnFind(hits) {
                     observer.disconnect();
                     if (this.debug)
-                        console.log("whenSelectorAll found "+hits.length +" for " + selector + " with text "+textContent);
+                        console.log("whenSelectorAll found "+hits.length +" for " + selector + " with text "+textToMatch);
                     callback(hits);
                 }
                 observer = new MutationSummary({
-                    callback: this.whenSelectorHits.bind(this, textContent, disconnectOnFind),
+                    callback: this.whenSelectorHits.bind(this, textToMatch, disconnectOnFind),
                     queries: [
                         {element: selector}
                     ]
@@ -273,8 +276,8 @@ function extensionInjectedScript(testURL, testParentURL, jsonSignalTokens) {
         },
         clickSelector: function(args) {
             var selector = args['0'];
-            var textContent = args['1'];
-            this.whenSelectorAll(selector, textContent, function(hits) {
+            var textToMatch = args['1'];
+            this.whenSelectorAll(selector, textToMatch, function(hits) {
                 this.click(hits[0]);
             }.bind(this));
         },
@@ -469,12 +472,12 @@ TestRunnerPanel.interrupt = function() {
 }
 
 /*
-                     +--------------Load/Run/Debug-------+
-                     \/                                               |
+            +--------------Load/Run/Debug-------+
+            \/                                  |
   States: Loaded----Run/Debug---> Running -> Ran  <-+
-                                                       |                        |
-                                                  Interrupt                 |
-                                                      +--> Interrupted +
+                     |                        |
+                    Interrupt                 |
+                             +--> Interrupted +
  */
 TestRunnerPanel.stateLoaded = function()
 {
