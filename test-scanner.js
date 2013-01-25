@@ -1,32 +1,46 @@
+var DEBUG = false;
+
+var ChromeBackgroundMethods = {
+    GET: function(url, callback, errback) {}
+};
+
+console.log("ChromeBackgroundMethods ", ChromeBackgroundMethods);
+
+function xhrGET(url, callback, errback) {
+    if (!this.proxy) {
+        this.proxy = (new RemoteMethodCall.Requestor(ChromeBackgroundMethods, ChannelPlate.DevtoolsTalker)).serverProxy();
+    }
+    this.proxy.GET(url, callback, errback);
+}
 
 var LayoutTests = [
-    {
+ /*   {
         testParentURL: 'devtools.html',
         baseURL:  "http://localhost:9696",
         folders: [
-            "inspector/console",
-            "inspector/debugger",
-            "inspector/editor",
-            "inspector/elements",
-            "inspector/extensions",
-            "inspector/profiler",
-            "inspector/styles",
-            "inspector/timeline",
-            "inspector",
+            "/LayoutTests/inspector/console",
+            "/LayoutTests/inspector/debugger",
+            "/LayoutTests/inspector/editor",
+            "/LayoutTests/inspector/elements",
+            "/LayoutTests/inspector/extensions",
+            "/LayoutTests/inspector/profiler",
+            "/LayoutTests/inspector/styles",
+            "/LayoutTests/inspector/timeline",
+            "/LayoutTests/inspector",
        ]
     },
     {
         testParentURL: 'devtools.html',
         baseURL:  "http://127.0.0.1:8000",
         folders: [
-            "http/tests/inspector",
+            "/LayoutTests/http/tests/inspector",
        ]
-    },
+    }, */
     {
         extension: true,
         testParentURL: 'QuerypointDevtoolsPage.html',
         baseURL: "http://localhost:8686/test",
-        folders: ["Panel"]
+        folders: ["/LayoutTests/Panel"]
     }
 ];
 
@@ -36,42 +50,43 @@ LayoutTests.forEach(function(layoutTest){
     });
 });
 
-function request(method, url, callback, errback) {
-    if (!this.requestCreator) {
-        this.requestCreator = new ChannelPlate.RequestCreator(ChannelPlate.DevtoolsTalker);
-    }
-    this.requestCreator.request(method, [url], function() {
-        if (arguments[0] === "Error") {
-          var message = arguments[1];
-          errback(url, message);
-        } else {
-          callback(url, arguments[0]);
-        }
-  });
-}
-
 var parser = new DOMParser();
+var unfetchedByURL = {};
 
 function scanFolder(baseURL, folder, testParentURL, extension)
 {
-    var url = baseURL+"/LayoutTests/" + folder + "/";
-    request('GET', url, function onload(urlIn, html) {
+    var url = baseURL + folder + "/";
+    xhrGET(url, function onload(html) {
             var doc = document.implementation.createHTMLDocument("");
             doc.body.innerHTML = html;
             var links = doc.querySelectorAll("a");
+            var linksFetched = [];
+            console.log(links.length + ' in ' + url);
             for (var i = 0; i < links.length; ++i) {
                 var href = links[i].getAttribute('href');
                 var match = href.match(/[^\/]*\/([^\/]+\.html)$/);
                 if (!match)
                     continue;
+                linksFetched.push(href);
                 var indexLayoutTests = href.indexOf('/LayoutTests/');
-                fetchExpectations(baseURL + href.substr(indexLayoutTests), testParentURL, extension);
+                var testCaseURL = baseURL + href.substr(indexLayoutTests);
+                fetchExpectations(testCaseURL, testParentURL, extension);
             }
+            console.log('fetching ' + linksFetched.length + ' in ' + url);
         },
-        function onerror(url, message) {
+        function onerror(message) {
           console.error(window.location + ": XHR "+url+" failed ", message);
         }
     );
+}
+
+if (DEBUG) {
+    setInterval(function() {
+        console.log(Object.keys(unfetchedByURL).length + " unfetched");
+        console.log(Object.keys(unfetchedByURL).forEach(function(url){
+            console.log('Unfetched[' + url + ']=' + unfetchedByURL[url]);
+        }))
+    }, 5000);    
 }
 
 function fetchExpectations(path, testParentURL, extension)
@@ -83,7 +98,9 @@ function fetchExpectations(path, testParentURL, extension)
     var chromiumSegment = "/LayoutTests/platform/chromium/";
     var chromiumPath = path.replace("/LayoutTests/", chromiumSegment);
 
-    function filter(url, expectations) {  
+    function filter(expectations) {
+        unfetchedByURL[testCaseURL] = false;
+                  
         var expectationLines = expectations.split("\n");
         var filtered = [];
         for (var i = 0; i < expectationLines.length; ++i) {
@@ -96,7 +113,7 @@ function fetchExpectations(path, testParentURL, extension)
         }
         var testExpectations = {
             testCaseURL: testCaseURL, 
-            expectedURL: url, 
+            expectedURL: path, 
             expected: filtered.join("\n"),
             testParentURL: testParentURL,
             extension: extension
@@ -104,22 +121,18 @@ function fetchExpectations(path, testParentURL, extension)
         window.parent.postMessage(["test", testExpectations], "*");
     }
     
-    fetch(chromiumPath, filter, function(url, msg) {
+    unfetchedByURL[testCaseURL] = true;
+
+    xhrGET(chromiumPath, filter, function(msg) {
         if (msg === 404) {
                 // If we don't find the expectations under chromium, try webkit proper
-                fetch(path, filter, function(url, msg) {
+                xhrGET(path, filter, function(msg) {
                   console.warn("Failed to find expected results for test case "+path, msg);
                 });     
         } else {
-            console.warn("Failed to load "+ url +" for chromiumPath "+chromiumPath, msg);
+            // normal console.warn("Failed to load "+ url +" for chromiumPath "+chromiumPath, msg);
         }
-            
     });
 }
 
-function fetch(path, callback, errback)
-{
-    request('GET', path, callback, errback);
-    return;
-}
 

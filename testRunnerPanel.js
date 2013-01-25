@@ -420,6 +420,9 @@ var TestRunnerPanel = {
 };
 
 TestRunnerPanel.loadTests = function loadTests() {
+    console.log("loadTests");
+    TestRunnerPanel.unfilteredTotalTests = 0;
+    TestRunnerPanel.filteredTotalTests = 0;
     document.getElementById("outline").removeChildren();
     TestRunnerPanel.treeOutline = new TreeOutline(document.getElementById("outline"));
 
@@ -546,6 +549,7 @@ TestRunnerPanel.attachListeners = function attachListeners() {
     document.querySelector('.interrupt').addEventListener('click', function(){
         TestRunnerPanel.interrupt();
     });
+    console.log("attachListeners complete")
 }
 
 function TestModel(testData) {
@@ -742,10 +746,12 @@ function onMessageFromTestScanner(event)
         var model = new TestModel(testData);
         var filterText = TestRunnerPanel.getFilter();
         var reFilter = filterText ? new RegExp(filterText) : null;
+        TestRunnerPanel.unfilteredTotalTests++;
         if (reFilter) {
             if (!reFilter.test(model.expectedURL))
                 return;
         }
+        TestRunnerPanel.filteredTotalTests;
         TestRunnerPanel.addTest(model);
     }
 }
@@ -753,6 +759,7 @@ window.addEventListener("message", onMessageFromTestScanner, true);
 
 function onload()
 {
+console.log("onload calling initialize");
     TestRunnerPanel.initialize();
 
     var queryParamsObject = {};
