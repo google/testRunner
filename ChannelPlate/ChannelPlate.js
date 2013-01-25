@@ -8,7 +8,7 @@
 var ChannelPlate = (function channelPlateModule() {
 
 "use strict";
-var DEBUG = true;
+var DEBUG = false;
 
 // ----------------------------------------------------------------------------
 // Utilities
