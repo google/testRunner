@@ -1,14 +1,14 @@
 var DEBUG = false;
 
-var ChromeBackgroundMethods = {
+var XHRInBackground = {
     GET: function(url, callback, errback) {}
 };
 
-console.log("ChromeBackgroundMethods ", ChromeBackgroundMethods);
+console.log("XHRInBackground ", XHRInBackground);
 
 function xhrGET(url, callback, errback) {
     if (!this.proxy) {
-        this.proxy = (new RemoteMethodCall.Requestor(ChromeBackgroundMethods, ChannelPlate.DevtoolsTalker)).serverProxy();
+        this.proxy = (new RemoteMethodCall.Requestor(XHRInBackground, ChannelPlate.DevtoolsTalker)).serverProxy();
     }
     this.proxy.GET(url, callback, errback);
 }

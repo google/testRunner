@@ -45,9 +45,9 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens) {
         var testCaseIFrame = document.createElement('iframe');
         testCaseIFrame.setAttribute('style', 'width:0;height:0;opacity:0');
         document.body.appendChild(testCaseIFrame);
-
-        var server = new RemoteMethodCall.Responder(PatientSelector, ChannelPlate.Parent);
-        server.start(testCaseIFrame, testURL);
+        ChannelPlate.Parent(testCaseIFrame, testURL, function(rawPort){
+            var server = new RemoteMethodCall.Responder(PatientSelector, rawPort);
+        });
     }
     
     window.addEventListener('load', startServer);
