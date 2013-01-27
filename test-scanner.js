@@ -38,7 +38,7 @@ var LayoutTests = [
     }, */
     {
         extension: true,
-        testParentURL: 'QuerypointDevtoolsPage.html',
+        testParentURL: 'mpbflbdfncldfbjicfcfbaikknnbfmae',
         baseURL: "http://localhost:8686/test",
         folders: ["/LayoutTests/Panel"]
     }

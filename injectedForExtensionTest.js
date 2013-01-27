@@ -7,10 +7,11 @@
 function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens) {
     var SignalTokens = JSON.parse(jsonSignalTokens);
     
-    var path = window.location.pathname;
-    var matchTestParentURL = (path.indexOf(testParentURL) !== -1);       
+    var path = window.location.href;
     var matchDevtoolsURL = (path.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1);
-
+    var matchTestParentURL = (window.location.host.indexOf(testParentURL) !== -1);       
+    
+console.log("injectedForExtensionTest testParentURL " + testParentURL + ' vs ' +path);
     if (!matchDevtoolsURL && !matchTestParentURL)
         return; 
     
@@ -30,7 +31,7 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens) {
                 script.onload = function() {
                     loaded.push(script.src);
                     if (loaded.length === scripts.length) {
-                       console.log(loaded.length + " scripts loaded and ready"); 
+                       console.log(loaded.length + " scripts loaded and ready", loaded); 
                     }
                 };
                 document.getElementsByTagName('head')[0].appendChild(script);    
@@ -41,16 +42,40 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens) {
         window.addEventListener('DOMContentLoaded', appendScriptTags);
     }());
     
-    function startServer() {
+    if (matchDevtoolsURL) {
+
+      function createTestCaseIframe() {
         var testCaseIFrame = document.createElement('iframe');
         testCaseIFrame.setAttribute('style', 'width:0;height:0;opacity:0');
         document.body.appendChild(testCaseIFrame);
-        ChannelPlate.Parent(testCaseIFrame, testURL, function(rawPort){
-            var server = new RemoteMethodCall.Responder(PatientSelector, rawPort);
-        });
-    }
-    
-    window.addEventListener('load', startServer);
+        return testCaseIFrame;
+      }
 
-    console.log("injectedForExtensionTest complete in " + window.location.href);
+      function startServer() {
+        var testCaseServer;
+        ChannelPlate.Listener(testURL, function(rawPort, iframeURL){
+            testCaseServer = new RemoteMethodCall.Responder(PatientSelector, rawPort);
+            console.log('start ChannelPlate server in ' + window.location.href + ' for iframe ' + iframeURL);
+        });
+        // Add frame for test case
+        var testCaseIFrame = createTestCaseIframe();
+        testCaseIFrame.src = testURL;
+        console.log("startServer completed, appended iframe " + testURL);
+      }
+      
+      window.addEventListener('extensionsRegistered', startServer);
+      console.log("injectedForExtensionTest found devtoolsURL, waiting for extensionsRegister " + window.location.href);
+
+    } else if (matchTestParentURL) {
+        // then we are in one of the devtools extension iframes
+        function startListener() {
+          var testServer;
+          ChannelPlate.Listener("chrome-extension://ggimboaoffjaeoblofehalflljohnfbl", function(rawPort, iframeURL){
+              testServer = new RemoteMethodCall.Responder(PatientSelector, rawPort);
+              console.log("injectedForExtensionTest started server to " + iframeURL + " from " + window.location.href);
+          });
+          console.log("injectedForExtensionTest started listener in extension URL " + window.location.href);
+        }
+        window.addEventListener('load', startListener);
+    }
 }
