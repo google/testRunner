@@ -81,6 +81,7 @@ window.PatientSelector = (function(){
         },
 
         _whenSelectorHits: function(textToMatch, callback, mutationSummary) {
+            console.log("....PatientSelector._whenSelectorHits mutationSummary ", mutationSummary);
             var addedElements = mutationSummary[0].added;
             this.hits = this._textSelectorAll(addedElements, textToMatch);
             if (this.hits.length)
@@ -107,6 +108,9 @@ window.PatientSelector = (function(){
                         {element: selector}
                     ]
                 });
+                rawObserver = new MutationObserver(function(){console.log("MutationObserver");});
+
+                rawObserver.observe(document, {subtree: true});
             } 
         },
 
@@ -168,6 +172,16 @@ window.PatientSelector = (function(){
                 PatientSelector._click(PatientSelector.hits[0], callback);
             });
         },
+
+        evaluateInPage: function(expr, callback) {
+            chrome.devtools.inspectedWindow.eval(expr, callback);
+        },
+
+        reloadPage: function(callback) {
+            chrome.devtools.inspectedWindow.reload();
+            callback();
+        },
+
         //------------------------------------------------------------------------------------
         // For addressing command to extension iframes
 
