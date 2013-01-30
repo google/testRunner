@@ -1,7 +1,7 @@
 // Google BSD license http://code.google.com/google_bsd_license.html
 // Copyright 2013 Google Inc. johnjbarton@google.com
 
-// whenSelectorAll callback on selector+textMatch, either immediate or after future mutation  
+// Feature testing API, generally async queries that wait for matching elements to appear 
 
 window.PatientSelector = (function(){
 
@@ -35,26 +35,32 @@ window.PatientSelector = (function(){
                 }, []);
         },
 
+        // If selector starts with pipe ('| '), select within previous match
         _querySelectorAll: function(selector, textToMatch) {
             var m = /^\| (.*)/.exec(selector);
             if (m) {
                 selector = m[1];
-                target = this.hits[0];
+                targets = this.hits;
             } else {
-                target = document;
+                targets = [document];
             }
-            var nodeList;
+           
             try {
-                nodeList = target.querySelectorAll(selector);
+                var nodes = this._selected = [];
+                var nodeList;
+                targets.forEach(function(target) {
+                    nodeList = target.querySelectorAll(selector);
+                    for (var i = 0; i < nodeList.length; i++) {
+                        this._selected.push(nodeList[i]);
+                    }    
+                }.bind(this));
             } catch (exc) {
-                console.error("....PatientSelector._querySelectorAll query failed for " + selector + ": " + exc, target);
+                console.error("....PatientSelector._querySelectorAll query failed for " + selector + ": " + exc, targets);
             }
-            var nodes = this._selected = [];
-            for (var i = 0; i < nodeList.length; i++) {
-                this._selected.push(nodeList[i]);
-            }
+
             if (DEBUG) 
                 console.log("....PatientSelector._querySelectorAll finds "+this._selected.length+" matches for "+selector);
+
             if (textToMatch) {
                 nodes = this._textSelectorAll(nodes, textToMatch);
                 if (DEBUG)
@@ -168,18 +174,35 @@ window.PatientSelector = (function(){
 
         selectTokenInSource: function(editorTokens, callback) {
             console.log("....PatientSelector.selectTokenInSource(" + editorTokens.length + " editorTokens) ", editorTokens);
-            function next(hits) {
+            var visibleSourceElement = this._querySelectorAll('.CodeMirror-lines');
+            var visibleSourceLines = this._querySelectorAll('| pre');
+            var mark = 0;
+            function next() {
                 var token = editorTokens.shift();
                 var selector = 'span.cm-' + token.type;
                 var text = token.text;
                     
                 if (editorTokens.length) {
-                    PatientSelector.whenSelectorAll(selector, text, next)    
+                    while (mark < visibleSourceLines.length) {
+                        PatientSelector.hits = [visibleSourceLines[mark]];
+                        var hits = PatientSelector._querySelectorAll('| '+selector, text);
+                        if (hits.length) 
+                            break;
+                        else
+                            mark++;
+                    }
+                    if (mark === visibleSourceLines.length - 1) {
+                        console.error("...PatientSelector.selectTokenInSource no source line matchs " + selector + ' & ' + text, visibleSourceLines);
+                        callback('err');
+                    } else {
+                        next();
+                    }
+
                 } else {
                     console.log('....PatientSelector.selectTokenInSource seeking pre ancestor of ', PatientSelector.hits);
                     PatientSelector.ancestor('pre', function() {
                         if (!PatientSelector.hits.length) {
-                            console.error('....PatientSelector,selectTokenInSource ancestor selection failed', PatientSelector);
+                            console.error('....PatientSelector.selectTokenInSource ancestor selection failed', PatientSelector);
                             callback();
                         }
                         // select within the previous hit
