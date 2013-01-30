@@ -57,7 +57,7 @@ var TestRunnerPanel = {
     },
 
     getFilter: function() {
-        return document.querySelector('.filterValue').value;
+        return document.querySelector('.filterValue').value.trim();
     },
 
     restore: function() {
