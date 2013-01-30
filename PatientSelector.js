@@ -49,12 +49,12 @@ window.PatientSelector = (function(){
             } catch (exc) {
                 console.error("....PatientSelector._querySelectorAll query failed for " + selector + ": " + exc, target);
             }
-            var nodes = [];
+            var nodes = this._selected = [];
             for (var i = 0; i < nodeList.length; i++) {
-                nodes.push(nodeList[i]);
+                this._selected.push(nodeList[i]);
             }
             if (DEBUG) 
-                console.log("....PatientSelector._querySelectorAll finds "+nodes.length+" matches for "+selector);
+                console.log("....PatientSelector._querySelectorAll finds "+this._selected.length+" matches for "+selector);
             if (textToMatch) {
                 nodes = this._textSelectorAll(nodes, textToMatch);
                 if (DEBUG)
@@ -80,12 +80,60 @@ window.PatientSelector = (function(){
             callback();
         },
 
-        _whenSelectorHits: function(textToMatch, callback, mutationSummary) {
-            console.log("....PatientSelector._whenSelectorHits mutationSummary ", mutationSummary);
-            var addedElements = mutationSummary[0].added;
-            this.hits = this._textSelectorAll(addedElements, textToMatch);
+        _textChanges: function(textToMatch, callback, mutationSummary) {
+            console.log("....PatientSelector._textChanges mutationSummary ", mutationSummary[0]);
+            var target = mutationSummary[0].target;
+            this.hits = this._textSelectorAll([target], textToMatch);
             if (this.hits.length)
                 callback();
+        },
+
+        _createTextChangeObserver: function(textToMatch, selection) {
+            return new MutationSummary({
+                callback: this._textChanges.bind(this, textToMatch, this._disconnectOnFind),
+                queries:[{characterData: true}],
+                rootNode: selection
+            });
+        },
+
+        _whenSelectorHits: function(textToMatch, callback, mutationSummary) {
+            console.log("....PatientSelector._whenSelectorHits mutationSummary ", mutationSummary[0]);
+            var added = mutationSummary[0].added;
+            this.hits = this._textSelectorAll(added, textToMatch);
+            if (this.hits.length) {
+                this._disconnectOnFind();
+                return;
+            }
+            added.forEach(function(element) {
+                this._textChangeObservers.push(this._createTextChangeObserver(textToMatch, element));
+            }.bind(this));
+        },
+
+        _setMutationObservers: function(selector, textToMatch, callback) {
+                if (DEBUG)
+                    console.log("....PatientSelector.whenSelectorAll waiting for " + selector + " with text "+textToMatch + ' in ' + doc());
+
+                this._disconnectOnFind = function() {
+                    this._addedSelectionObserver.disconnect();
+                    if (this._textChangeObservers) {
+                        this._textChangeObservers.forEach(function(observer){
+                            observer.disconnect();
+                        });
+                    }
+                    if (DEBUG)
+                        console.log("....PatientSelector.whenSelectorAll found "+PatientSelector.hits.length +" for " + selector + " with text "+textToMatch);
+                    callback();
+                }.bind(this);
+
+                if (this._selected.length) {
+                    this._textChangeObservers = this._selected.map(this._createTextChangeObserver.bind(this, textToMatch));
+                }
+                this._addedSelectionObserver = new MutationSummary({
+                    callback: this._whenSelectorHits.bind(this, textToMatch, this._disconnectOnFind),
+                    queries: [
+                        {element: selector}
+                    ]
+                });
         },
 
         whenSelectorAll: function(selector, textToMatch, callback) {
@@ -93,24 +141,11 @@ window.PatientSelector = (function(){
             if (this.hits.length) {
                 callback();
             } else {
-                if (DEBUG)
-                    console.log("....PatientSelector.whenSelectorAll waiting for " + selector + " with text "+textToMatch + ' in ' + doc());
-                var observer;
-                function disconnectOnFind(hits) {
-                    observer.disconnect();
-                    if (DEBUG)
-                        console.log("....PatientSelector.whenSelectorAll found "+PatientSelector.hits.length +" for " + selector + " with text "+textToMatch);
-                    callback();
+                try {
+                    this._setMutationObservers(selector, textToMatch, callback);
+                } catch (exc) {
+                    console.error("....PatientSelector._setMutationObservers FAIL "+exc, exc);
                 }
-                observer = new MutationSummary({
-                    callback: this._whenSelectorHits.bind(this, textToMatch, disconnectOnFind),
-                    queries: [
-                        {element: selector}
-                    ]
-                });
-                rawObserver = new MutationObserver(function(){console.log("MutationObserver");});
-
-                rawObserver.observe(document, {subtree: true});
             } 
         },
 
@@ -180,6 +215,14 @@ window.PatientSelector = (function(){
         reloadPage: function(callback) {
             chrome.devtools.inspectedWindow.reload();
             callback();
+        },
+
+        extractText: function(selector, callback) {
+            var text = PatientSelector._querySelectorAll(selector).map(function(node){
+                return node.textContent;
+            }).join('|');
+            console.log("testResult "+text);
+            callback(text);
         },
 
         //------------------------------------------------------------------------------------
