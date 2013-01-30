@@ -13,7 +13,7 @@ var AsyncMachine = {
   },
   runOp: function(prevResult) {
     if (prevResult) {
-      console.log("test result: " + prevResult);
+      console.log("InspectorTest.addResult: " + prevResult);
     }
     var op = this.ops.shift();
     if (op) {
@@ -21,7 +21,7 @@ var AsyncMachine = {
       console.log("Running test operation " + fncName, op);
       op.fnc.apply(this, op.args);
     } else {
-      console.log("Test Operations Completed")
+      console.log("InspectorTest.testComplete: Test Operations Completed")
     }
   }
 
