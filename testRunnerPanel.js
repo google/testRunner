@@ -44,70 +44,6 @@ var SignalTokens = {
     DEVTOOLS_PATH: 'inspector/front-end/devtools.html'
 };
 
-
-/*
- * JS injected into an extension iframe can call for operations in WebInspector by 
- * writing a special string to the console. We monitor the console for these strings
- * and evaluate into the appropriate iframe.
- */
-var ExtensionTestProxy = {
-
-      initialize: function() {
-        this._onMessageAdded = this._onMessageAdded.bind(this);
-        function appendIfDocument(documents, resource) {
-            if (resource.type === 'document')
-                       documents.push(resource.url);
-            return documents;
-        }
-        chrome.devtools.inspectedWindow.getResources(function(resources){
-                this.documents = resources.reduce(appendIfDocument, []);
-                console.log("documents", this.documents);
-                this.devtoolsURL = ""
-                this.documents.some(function(url){
-                    if (url.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1)
-                       return this.devtoolsURL = url;
-                }.bind(this));
-                console.assert(this.devtoolsURL);
-        }.bind(this));
-
-        chrome.devtools.inspectedWindow.onResourceAdded.addListener(function(resource){
-                this.documents = appendIfDocument(this.documents, resource);
-        }.bind(this));
-
-
-    },
-
-    start: function(testParentURL) {
-      this.testParentURL = testParentURL; // bah members
-      chrome.experimental.devtools.console.onMessageAdded.addListener(this._onMessageAdded);
-      console.log("ExtensionTestProxy start");  
-    },
-
-    _onMessageAdded: function(event) {
-        if (event.text.indexOf(SignalTokens.PATIENT_SELECTOR + '@') === 0) {
-            var cmd = event.text.substr(SignalTokens.PATIENT_SELECTOR.length + 1);
-            var targetWindowURL = this.testParentURL;
-            if (cmd.indexOf(SignalTokens.DEVTOOLS_WINDOW)) {
-                targetWindowURL = this.devtoolsURL;
-            }
-            console.log("ExtensionTestProxy called with ", cmd);
-            var frame = {
-                url: targetWindowURL,
-                securityOrigin: ensureOrigin(targetWindowURL)
-            }
-            chrome.devtools.inspectedWindow.eval(cmd, {frame: frame}, function(value, isException){
-                console.log(cmd + ": " + value + " isException: " + isException);
-            });
-        }
-    },
-    stop: function() {
-        chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded); 
-        console.log("ExtensionTestProxy stop");   
-    },     
-}
-
-ExtensionTestProxy.initialize();
-
 var TestRunnerPanel = { 
     tests: [],
 
@@ -397,7 +333,6 @@ TestRunner.prototype = {
                 return;
             }
         }
-        ExtensionTestProxy.start(this._testModel.testParentURL);
         this._testView.running();
         this._listenForResults();
         this._reloadWithTestScripts(debug);
@@ -450,7 +385,6 @@ TestRunner.prototype = {
         if (TestRunnerPanel.debugDiffs) console.log("actual", this.actual);
         chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded); 
         clearTimeout(this._watchDog);
-        ExtensionTestProxy.stop();
         var pass = this._testView.update(this.actual);    
         this._next(pass);
     },
