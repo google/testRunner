@@ -186,10 +186,13 @@ window.PatientSelector = (function(){
                     while (mark < visibleSourceLines.length) {
                         PatientSelector.hits = [visibleSourceLines[mark]];
                         var hits = PatientSelector._querySelectorAll('| '+selector, text);
-                        if (hits.length) 
-                            break;
-                        else
+                        if (hits.length) {
+                            console.log('....PatientSelector.selectTokenInSource ' + selector + '&' + text + ' match ' + visibleSourceLines[mark].textContent); 
+                            mark++;  
+                            break;                            
+                        } else {
                             mark++;
+                        }
                     }
                     if (mark === visibleSourceLines.length - 1) {
                         console.error("...PatientSelector.selectTokenInSource no source line matchs " + selector + ' & ' + text, visibleSourceLines);
