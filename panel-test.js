@@ -51,6 +51,9 @@ function clickQPOperation(name, then) {
 function whenSelectorAll(selector, text, then) {
   ExtensionPanelTestAPI.whenSelectorAll(selector, text, then);
 }
+function clickSelector(selector, text, then) {
+  ExtensionPanelTestAPI.clickSelector(selector, text, then);
+}
 function evaluateInPage(expr, then) {
   ExtensionPanelTestAPI.evaluateInPage(expr, then);
 }
