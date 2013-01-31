@@ -55,7 +55,7 @@ function clickSelector(selector, text, then) {
   ExtensionPanelTestAPI.clickSelector(selector, text, then);
 }
 function evaluateInPage(expr, then) {
-  ExtensionPanelTestAPI.evaluateInPage(expr, then);
+  ExtensionTestAPI.evaluateInPage(expr, then);
 }
 function extractText(selector, then) {
   ExtensionPanelTestAPI.extractText(selector, then);
