@@ -1,5 +1,8 @@
-Chrome devtools extension to debug Chrome devtools LayoutTests.
-For use by developers of Chrome devtools.
+Chrome devtools extension to test and debug the Querypoint Debugger, the qpp devtools extension,
+and the devtoolsExtended Chrome Extension.
 
-Requires a patched version of devtools for now. The patch is availalble:
-https://bugs.webkit.org/show_bug.cgi?id=92429
+See https://github.com/google/qpp/wiki/Using-testRunner-and-the-nodejs-test-server
+
+This extension can also be used to run Chrome devtools LayoutTests, 
+for use by developers of Chrome devtools.  Many of the WebInspector LayoutTests will run 
+under testRunner and they can be debugged.
