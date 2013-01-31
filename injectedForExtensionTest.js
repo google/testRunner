@@ -19,7 +19,7 @@ console.log("injectedForExtensionTest testParentURL " + testParentURL + ' vs ' +
         var scripts = [
             "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/ChannelPlate/ChannelPlate.js",
             "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/ChannelPlate/RemoteMethodCall.js",
-            "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/PatientSelector.js",
+            "chrome-extension://mpbflbdfncldfbjicfcfbaikknnbfmae/test/LayoutTests/PatientSelector.js",
             "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/mutation-summary/mutation_summary.js"
         ];
         var loaded = [];
