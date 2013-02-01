@@ -382,10 +382,10 @@ TestRunner.prototype = {
 
     notifyDone: function(actual)
     {
-        if (TestRunnerPanel.debugDiffs) console.log("actual", this.actual);
+        if (TestRunnerPanel.debugDiffs) console.log("actual", actual);
         chrome.experimental.devtools.console.onMessageAdded.removeListener(this._onMessageAdded); 
         clearTimeout(this._watchDog);
-        var pass = this._testView.update(this.actual);    
+        var pass = this._testView.update(actual);    
         this._next(pass);
     },
 }
