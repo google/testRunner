@@ -342,11 +342,50 @@ TestRunner.prototype = {
         chrome.experimental.devtools.console.onMessageAdded.addListener(this._onMessageAdded);
     },
 
+    _metaOperationToken: "command: ",
+    _metaOperationCounter: 0,
+
+    _metaServer: function() {
+        if (!this.backgroundProxy) {
+            this.backgroundProxy = (new RemoteMethodCall.Requestor(BackgroundServerAPI, ChannelPlate.DevtoolsTalker)).serverProxy();
+        }
+        return this.backgroundProxy;
+    },
+
+    _metaResult: function(resultNumber, result) {
+        console.log("_metaResult for " + resultNumber, result);
+    },
+
+    _metaFailure: function(resultNumber, result) {
+       console.error("_metaFailure for " + resultNumber, result); 
+    },
+
+    _metaOperation: function(resultNumber, message) {
+        var segments = message.split(' ');
+        var command = segments.shift();
+        var args = segments;
+        args.push(this._metaResult.bind(this, resultNumber));
+        args.push(this._metaFailure.bind(this, resultNumber));
+        this._metaServer()[command](args);
+    },
+
+    _checkForMetaOperations: function(text) {
+        var command = text.indexOf(this._metaOperationToken);
+        if (command === 0) {
+            var op = this._metaOperationCounter++;
+            this._metaOperation(op, text.substring(this._metaOperationToken.length))
+            return "commandResult " + op;
+        } else {
+            return text;    
+        }
+    },
+
     _onMessageAdded: function(message) {
         var mark = message.text.indexOf(SignalTokens.RESULT);
         if (mark !== -1) {
             this.actual = this.actual || "";
-            this.actual += message.text.substring(mark + SignalTokens.RESULT.length) + '\n';
+            var actualLine = message.text.substring(mark + SignalTokens.RESULT.length) + '\n'; 
+            this.actual += this._checkForMetaOperations(actualLine);
         } else {
           mark = message.text.indexOf(SignalTokens.COMPLETE);
           if (mark !== -1) {
