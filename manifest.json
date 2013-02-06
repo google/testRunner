@@ -10,7 +10,7 @@
    "devtools_page": "testRunnerDevtoolsPage.html",
    "options_page": "options.html",
     "background": {
-      "scripts": ["ChannelPlate/ChannelPlate.js", "ChannelPlate/RemoteMethodCall.js", "ChannelPlate/XHRInBackground.js", "ChannelPlate/XHRInBackgroundServer.js"] // workaround CSP
+      "scripts": ["ChannelPlate/ChannelPlate.js", "ChannelPlate/RemoteMethodCall.js", "ChannelPlate/XHRInBackground.js", "ScreenShotInBackground.js", "BackgroundServer.js"] // workaround CSP
     },
   "permissions" :
     [
