@@ -364,16 +364,17 @@ TestRunner.prototype = {
         var segments = message.split(' ');
         var command = segments.shift();
         var args = segments;
+        args.unshift(chrome.devtools.inspectedWindow.tabId);
         args.push(this._metaResult.bind(this, resultNumber));
         args.push(this._metaFailure.bind(this, resultNumber));
-        this._metaServer()[command](args);
+        this._metaServer()[command].apply(null, args);
     },
 
     _checkForMetaOperations: function(text) {
         var command = text.indexOf(this._metaOperationToken);
         if (command === 0) {
             var op = this._metaOperationCounter++;
-            this._metaOperation(op, text.substring(this._metaOperationToken.length))
+            this._metaOperation(op, text.substring(this._metaOperationToken.length).trim())
             return "commandResult " + op;
         } else {
             return text;    

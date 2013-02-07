@@ -6,7 +6,10 @@ var DEBUG = false;
 
 var ScreenShotInBackground = {};
 
-ScreenShotInBackground.screenshot = function(method, url, callback, errback) {
-   console.log("ScreenShotInBackground.screenshot " + url);
+ScreenShotInBackground.screenshot = function(tabId, callback, errback) {
+   console.log("ScreenShotInBackground.screenshot " + tabId);
+   chrome.tabs.get(tabId, function(tab) {
+      chrome.tabs.captureVisibleTab(tab.windowId, {format: 'png'}, callback);
+   });
 };
 

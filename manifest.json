@@ -16,6 +16,7 @@
     [
       "http://*/", // Cross site XHR
       "https://*/", 
+      "chrome-extension://*/*",
       "experimental"  // chrome.experimental.devtools.console 
     ],
     "web_accessible_resources":

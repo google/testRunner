@@ -16,10 +16,10 @@ var AsyncMachine = {
     this.ops.push({fnc: fnc, args: args, resultProcessor: resultProcessor});
   },
   runOp: function(prevResult) {
-    if (prevResult) {
-      if (this.resultProcessor) {
+    if (this.resultProcessor) {
         prevResult = this.resultProcessor(prevResult);
       }
+    if (prevResult) {
       console.log("InspectorTest.addResult: " + prevResult);
     }
     var op = this.ops.shift();

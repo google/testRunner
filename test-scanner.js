@@ -40,8 +40,8 @@ var LayoutTests = [
         extension: true,
         testParentURL: 'mpbflbdfncldfbjicfcfbaikknnbfmae',
         baseURL: "http://localhost:8686/test",
-        folders: ["/LayoutTests/Panel"]
-    }
+        folders: ["/LayoutTests/Panel", "/LayoutTests/DocGen"]
+    },
 ];
 
 LayoutTests.forEach(function(layoutTest){
