@@ -22,6 +22,21 @@ var AsyncMachine = {
     if (prevResult) {
       console.log("InspectorTest.addResult: " + prevResult);
     }
+    this.checkBlock();
+  },
+  unblock: function() { // called by evaluation from testRunner
+    return !delete this.blocked; 
+  },
+  checkBlock: function() {
+    if (this.blocked) {
+      console.log("AsyncMachine.blocked " + this.blocked);
+      setTimeout(this.checkBlock.bind(this), 5);
+    } else {
+      this.nextOp();
+    }
+  },
+
+  nextOp: function() {
     var op = this.ops.shift();
     if (op) {
       this.resultProcessor = op.resultProcessor;

@@ -318,6 +318,29 @@ function TestRunner(testModel,  testView, next)
     this._onMessageAdded = this._onMessageAdded.bind(this);
 }
 
+TestRunner.commands = {
+    _metaServer: function() {
+        if (!this.backgroundProxy) {
+            this.backgroundProxy = (new RemoteMethodCall.Requestor(BackgroundServerAPI, ChannelPlate.DevtoolsTalker)).serverProxy();
+        }
+        return this.backgroundProxy;
+    },
+    unblock: function(frameURL) {
+        console.log("TestRunner.commands.unblock "+frameURL);
+        chrome.devtools.inspectedWindow.eval('AsyncMachine.unblock()', {frameURL: frameURL}, function(result) {
+            console.log("TestRunner.commands.unblock "+result);
+        });
+    },
+    screenshot: function(resultNumber, surround, callback) {
+        this._metaServer().screenshot(chrome.devtools.inspectedWindow.tabId, function(dataURL) {
+            var result = surround.replace('screenshot', dataURL);
+            TestRunnerPanel.currentTestRunner.actual = TestRunnerPanel.currentTestRunner.actual.replace('commandResult ' + resultNumber, result);
+            console.log('screenshot for ' + resultNumber + ' with surround ' + surround, result.substring(0,50));
+            callback();
+        });
+    }
+}
+
 TestRunner.prototype = {
 
     run: function(debug)
@@ -342,40 +365,29 @@ TestRunner.prototype = {
         chrome.experimental.devtools.console.onMessageAdded.addListener(this._onMessageAdded);
     },
 
-    _metaOperationToken: "command: ",
+    _metaOperationToken: "function",
     _metaOperationCounter: 0,
 
-    _metaServer: function() {
-        if (!this.backgroundProxy) {
-            this.backgroundProxy = (new RemoteMethodCall.Requestor(BackgroundServerAPI, ChannelPlate.DevtoolsTalker)).serverProxy();
-        }
-        return this.backgroundProxy;
-    },
-
     _metaResult: function(resultNumber, result) {
-        console.log("_metaResult for " + resultNumber, result);
+        console.log("_metaResult for " + resultNumber, result.substring(100));
+        this.actual = this.actual.replace('commandResult '+resultNumber, result);
     },
 
     _metaFailure: function(resultNumber, result) {
        console.error("_metaFailure for " + resultNumber, result); 
     },
 
-    _metaOperation: function(resultNumber, message) {
-        var segments = message.split(' ');
-        var command = segments.shift();
-        var args = segments;
-        args.unshift(chrome.devtools.inspectedWindow.tabId);
-        args.push(this._metaResult.bind(this, resultNumber));
-        args.push(this._metaFailure.bind(this, resultNumber));
-        this._metaServer()[command].apply(null, args);
+    _metaOperation: function(resultNumber, fncString) {
+        var invoke = '(' + fncString + '(\"' + this._testModel.url + '\",' + resultNumber + '));';
+        eval(invoke);
     },
 
     _checkForMetaOperations: function(text) {
         var command = text.indexOf(this._metaOperationToken);
         if (command === 0) {
             var op = this._metaOperationCounter++;
-            this._metaOperation(op, text.substring(this._metaOperationToken.length).trim())
-            return "commandResult " + op;
+            this._metaOperation(op, text)
+            return 'commandResult ' + op + '\n';
         } else {
             return text;    
         }
