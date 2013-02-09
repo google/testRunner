@@ -15,6 +15,7 @@ var AsyncMachine = {
     args.push(this.runOp.bind(this));
     this.ops.push({fnc: fnc, args: args, resultProcessor: resultProcessor});
   },
+
   runOp: function(prevResult) {
     if (this.resultProcessor) {
         prevResult = this.resultProcessor(prevResult);
@@ -24,13 +25,15 @@ var AsyncMachine = {
     }
     this.checkBlock();
   },
+
   unblock: function() { // called by evaluation from testRunner
     return !delete this.blocked; 
   },
+
   checkBlock: function() {
     if (this.blocked) {
       console.log("AsyncMachine.blocked " + this.blocked);
-      setTimeout(this.checkBlock.bind(this), 5);
+      setTimeout(this.checkBlock.bind(this), 250);
     } else {
       this.nextOp();
     }

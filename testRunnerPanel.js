@@ -36,6 +36,7 @@ var skipList = [
 
 var SignalTokens = {
     COMPLETE: "InspectorTest.testComplete: ",
+    OUTPUT: "InspectorTest.testOutput: ",
     RESULT: "InspectorTest.addResult: ",
     CLEAR: "InspectorTest.clearResults: ",
     PATIENT_SELECTOR: "PatientSelectorAPI",
@@ -336,6 +337,18 @@ TestRunner.commands = {
             var result = surround.replace('screenshot', dataURL);
             TestRunnerPanel.currentTestRunner.actual = TestRunnerPanel.currentTestRunner.actual.replace('commandResult ' + resultNumber, result);
             console.log('screenshot for ' + resultNumber + ' with surround ' + surround, result.substring(0,50));
+            callback();
+        });
+    },
+    output: function(url, callback) {
+        console.log("TestRunner.commands.output " + url);
+        var request = { 
+            url: url,
+            content: TestRunnerPanel.currentTestRunner.actual 
+        };
+        // send directly to devtools-save
+        chrome.extension.sendMessage('jmacddndcaceecmiinjnmkfmccipdphp', request, function maybeSaved(response){
+            console.log("TestRunner.commands.output response ", response);
             callback();
         });
     }

@@ -68,8 +68,9 @@ function scanFolder(baseURL, folder, testParentURL, extension)
                 if (!match)
                     continue;
                 linksFetched.push(href);
+                var testCaseURL = baseURL;
                 var indexLayoutTests = href.indexOf('/LayoutTests/');
-                var testCaseURL = baseURL + href.substr(indexLayoutTests);
+                 testCaseURL += indexLayoutTests !== -1 ? href.substr(indexLayoutTests) : href;
                 fetchExpectations(testCaseURL, testParentURL, extension);
             }
             console.log('fetching ' + linksFetched.length + ' in ' + url);
