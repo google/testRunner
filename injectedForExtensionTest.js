@@ -51,31 +51,49 @@ console.log("injectedForExtensionTest testParentURL " + testParentURL + ' vs ' +
         return testCaseIFrame;
       }
 
-      function startServer() {
+      function startTestCaseServer() {
         var testCaseServer;
         ChannelPlate.Listener(testURL, function(rawPort, iframeURL){
             testCaseServer = new RemoteMethodCall.Responder(PatientSelector, rawPort);
-            console.log('start ChannelPlate server in ' + window.location.href + ' for iframe ' + iframeURL);
+            console.log('injectedForExtensionTest startTestCaseServer in ' + window.location.href + ' for iframe ' + iframeURL);
         });
         // Add frame for test case
         var testCaseIFrame = createTestCaseIframe();
         testCaseIFrame.src = testURL;
-        console.log("startServer completed, appended iframe " + testURL);
+        console.log("injectedForExtensionTest startTestCaseServer completed, appended iframe " + testURL);
+      }
+
+      function startProxyServers(event) {
+        var extensionInfos = event.data;
+        var started;
+        extensionInfos.forEach(function(info){
+          if (info.startPage.indexOf(testParentURL) !== -1) {
+            ChannelPlate.Listener(info.startPage, function(rawPort, iframeURL){
+              PatientSelector.createProxy(rawPort, iframeURL);
+              console.log('injectedForExtensionTest.startProxyServers in ' + window.location.href + ' for extension iframe ' + iframeURL);
+              if (!started) {
+                startTestCaseServer();
+                started = true;  
+              }
+            });
+            console.log('injectedForExtensionTest.startProxyServers listening for ' + info.startPage);  
+          }
+        });
       }
       
-      window.addEventListener('extensionsRegistered', startServer);
-      console.log("injectedForExtensionTest found devtoolsURL, waiting for extensionsRegister " + window.location.href);
+      window.addEventListener('extensionsRegistering', startProxyServers);
+      console.log("injectedForExtensionTest found devtoolsURL, waiting for extensionsRegistering " + window.location.href);
 
     } else if (matchTestParentURL) {
         // then we are in one of the devtools extension iframes
-        function startListener() {
-          var testServer;
-          ChannelPlate.Listener("chrome-extension://ggimboaoffjaeoblofehalflljohnfbl", function(rawPort, iframeURL){
-              testServer = new RemoteMethodCall.Responder(PatientSelector, rawPort);
-              console.log("injectedForExtensionTest started server to " + iframeURL + " from " + window.location.href);
-          });
-          console.log("injectedForExtensionTest started listener in extension URL " + window.location.href);
+        function startResponder() {
+          window._testRunnerService = {};
+          window._testRunnerService.responder  = new RemoteMethodCall.Responder(PatientSelector);
+          window._testRunnerService.channelPlate = new ChannelPlate.ChildIframe(window._testRunnerService.responder.onMessage);
+          window._testRunnerService.responder.accept(window._testRunnerService.channelPlate.port);
+          window.removeEventListener('load', startResponder);
+          console.log("injectedForExtensionTest.startListener in extension URL " + window.location.href);
         }
-        window.addEventListener('load', startListener);
+        window.addEventListener('load', startResponder);
     }
 }
