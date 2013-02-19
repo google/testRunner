@@ -4,21 +4,32 @@
 // This function is serialized and runs in every iframe when testing extensions
 // only. We test the window.location to add API only to the window being tested 
 // and to the main WebInspetor window.
-function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens) {
+function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, selectedForDebug) {
     var SignalTokens = JSON.parse(jsonSignalTokens);
     
     var path = window.location.href;
     var matchDevtoolsURL = (path.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1);
     var matchTestParentURL = (window.location.host.indexOf(testParentURL) !== -1);       
     
-console.log("injectedForExtensionTest testParentURL " + testParentURL + ' vs ' +path);
+    console.log("injectedForExtensionTest testParentURL " + testParentURL + ' vs ' +path);
+    
     if (!matchDevtoolsURL && !matchTestParentURL)
         return; 
-    
+
+    var debugFlags = selectedForDebug ? JSON.parse(selectedForDebug) : [];
+    console.log('injectedForExtensionTest debugFlags ', debugFlags);
+
+    function setDebugFlags() {
+      debugFlags.forEach(function(name){
+        DebugLogger.set(name, true);  
+      });
+    }
+
     (function(){
         var scripts = [
             "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/ChannelPlate/ChannelPlate.js",
             "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/ChannelPlate/RemoteMethodCall.js",
+            "chrome-extension://mpbflbdfncldfbjicfcfbaikknnbfmae/DebugLogger.js",
             "chrome-extension://mpbflbdfncldfbjicfcfbaikknnbfmae/test/LayoutTests/PatientSelector.js",
             "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/mutation-summary/mutation_summary.js"
         ];
@@ -31,15 +42,21 @@ console.log("injectedForExtensionTest testParentURL " + testParentURL + ' vs ' +
                 script.onload = function() {
                     loaded.push(script.src);
                     if (loaded.length === scripts.length) {
-                       console.log(loaded.length + " scripts loaded and ready", loaded); 
+                       console.log(loaded.length + " scripts loaded and ready", loaded);
+                       setDebugFlags(); 
                     }
                 };
                 document.getElementsByTagName('head')[0].appendChild(script);    
             });
             
         }
+
+        function onLoad() {
+          appendScriptTags();
+        }
+
         // We cannot inject during reload-injection, crashes extension.
-        window.addEventListener('DOMContentLoaded', appendScriptTags);
+        window.addEventListener('DOMContentLoaded', onLoad);
     }());
     
     if (matchDevtoolsURL) {
@@ -86,14 +103,20 @@ console.log("injectedForExtensionTest testParentURL " + testParentURL + ' vs ' +
 
     } else if (matchTestParentURL) {
         // then we are in one of the devtools extension iframes
-        function startResponder() {
-          window._testRunnerService = {};
-          window._testRunnerService.responder  = new RemoteMethodCall.Responder(PatientSelector);
-          window._testRunnerService.channelPlate = new ChannelPlate.ChildIframe(window._testRunnerService.responder.onMessage);
-          window._testRunnerService.responder.accept(window._testRunnerService.channelPlate.port);
-          window.removeEventListener('load', startResponder);
-          console.log("injectedForExtensionTest.startListener in extension URL " + window.location.href);
-        }
-        window.addEventListener('load', startResponder);
+
+      function startResponder() {
+        window._testRunnerService = {};
+        window._testRunnerService.responder  = new RemoteMethodCall.Responder(PatientSelector);
+        window._testRunnerService.channelPlate = new ChannelPlate.ChildIframe(window._testRunnerService.responder.onMessage);
+        window._testRunnerService.responder.accept(window._testRunnerService.channelPlate.port);
+        window.removeEventListener('load', startResponder);
+        console.log("injectedForExtensionTest.startListener in extension URL " + window.location.href);
+      }
+
+      function onLoad() {
+        setDebugFlags();
+        startResponder();
+      }
+      window.addEventListener('load', onLoad);
     }
 }

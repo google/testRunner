@@ -15,21 +15,20 @@
 <script src="BackgroundServerAPI.js"></script>
 <script src="ChannelPlate/ChannelPlate.js"></script>
 <script src="ChannelPlate/RemoteMethodCall.js"></script>
+<script src="knockout/knockout-2.2.0rc.debug.js"></script>
 <script src='testRunnerPanel.js'></script>
 <body>
-<h1>Querypoint Debugger testRunner <span class="state"></span></h1>
-<ul>
-<li>Use Chrome dev channel browser and nodejs</li>
-<li>Start the server for test cases on port 9696: <code>qpp/http/node DAVServer.js</code></li>
-<li>Run two copies of Chrome: 
-  <ol>
-    <li>"--remote-debugging-port=9222 --user-data-dir=serverProfile "</li>
-    <li>"--user-data-dir=clientProfile "</li>
-  </ol>
-</li>
-<li>Install the Querypoint debugger Chrome extension and this testRunner in the second copy.</li>
-</ul>
-Filter: <input id="filter" class="filterValue" type="text" size="40"></input><small><i>Click on results to load filter</i></small><br>
+<p>Querypoint Debugger testRunner (<a href="hints.html">help</a>)</p>
+<table>
+	<thead><th>Debug Flags</th></thead>
+	<tbody>
+		<tr><td>
+			<select class='debugLoggers' data-bind="optionCaption: 'Populated after one run', options: availableFlags, optionsText: 'name', selectedOptions: selectedFlags" size="5" multiple="true"></select>
+		</select></td></tr>
+	</tbody>
+</table>
+
+Filter: <input id="filter" class="filterValue" type="text" size="40"></input><small><i>Click on results to pre-load filter</i></small><br>
 <button class='load'>Load</button>
 <button class='debug' >Debug</button>
 <button class='run'>Run</button>

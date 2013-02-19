@@ -38,6 +38,7 @@ var SignalTokens = {
     COMPLETE: "InspectorTest.testComplete: ",
     OUTPUT: "InspectorTest.testOutput: ",
     RESULT: "InspectorTest.addResult: ",
+    INFO: "InspectorTest.info: ",
     CLEAR: "InspectorTest.clearResults: ",
     PATIENT_SELECTOR: "PatientSelectorAPI",
     DEVTOOLS_WINDOW: "DevtoolsWindowTestAPI",
@@ -47,10 +48,13 @@ var SignalTokens = {
 
 var TestRunnerPanel = { 
     tests: [],
-
+   
     initialize: function() {
         this.attachListeners();
         this.restore();
+        this.availableFlags = ko.observableArray([]);
+        this.selectedFlags = ko.observableArray([]);
+        ko.applyBindings(TestRunnerPanel);
     },
 
     setFilter: function(value) {
@@ -61,20 +65,41 @@ var TestRunnerPanel = {
         return document.querySelector('.filterValue').value.trim();
     },
 
+    addDebugFlag: function(flag) {
+        var exists = this.availableFlags().some(function(existingFlag) {
+            return (existingFlag.name === flag.name);
+        });
+        if (!exists) {
+            this.availableFlags.push(flag);
+            if (flag.selected == 'true') 
+                this.selectedFlags.push(flag);
+        }
+    },
+
+    selectedForDebug: function() {
+        return this.selectedFlags().map(function(flag){
+            return flag.name;
+        });
+    },
+
     restore: function() {
         var prevParameters = localStorage.getItem('testRunner');
         if (prevParameters) {
             prevParameters = JSON.parse(prevParameters);
             TestRunnerPanel.setFilter(prevParameters.filter);
+            this.availableFlags = ko.observableArray(prevParameters.availableFlags);
+            this.selectedFlags = ko.observableArray(prevParameters.selectedFlags);
         }
     },
 
     save: function() {
         var parameters = {
             filter: this.getFilter(),
+            availableFlags: this.availableFlags.slice(0),
+            selectedFlags: this.selectedFlags.slice(0)
         };
         localStorage.setItem('testRunner', JSON.stringify(parameters));
-    }
+    },
 };
 
 TestRunnerPanel.loadTests = function loadTests() {
@@ -351,6 +376,9 @@ TestRunner.commands = {
             console.log("TestRunner.commands.output response ", response);
             callback();
         });
+    },
+    registerDebugFlag: function(name, value) {
+        TestRunnerPanel.addDebugFlag({name: name, selected: value});
     }
 }
 
@@ -417,6 +445,15 @@ TestRunner.prototype = {
           if (mark !== -1) {
             this.actual += '\n';
             this.notifyDone(this.actual);
+          } else {
+            mark = message.text.indexOf(SignalTokens.INFO);
+            if (mark !== -1) {
+                var nv = message.text.substring(mark + SignalTokens.INFO.length);
+                var segments = nv.split(' ');
+                var name = segments[0];
+                var value = segments[1] === 'true' ? true : false;
+                TestRunner.commands.registerDebugFlag(name, value);
+            }
           }
         }
     },
@@ -433,7 +470,12 @@ TestRunner.prototype = {
             this._watchDog = setTimeout(this.notifyDone.bind(this), 10000);
         }
         
-        var argsAsString = '\"' + this._testModel.url + '\", \"' + this._testModel.testParentURL +'\", \'' + JSON.stringify(SignalTokens) + '\'';
+        var argsAsString = '\"' + this._testModel.url + '\", \"';
+        argsAsString += this._testModel.testParentURL +'\", \'';
+        argsAsString += JSON.stringify(SignalTokens) + '\'';
+        if (debug) {
+           argsAsString += ', \'' + JSON.stringify(TestRunnerPanel.selectedForDebug()) + '\'';
+        }
         var reloadOptions = {
             ignoreCache: true, 
             injectedScript:  '(' + runInEveryDebuggeeFrame + '(' + argsAsString + ')' +')',

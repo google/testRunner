@@ -16,6 +16,14 @@
     color: brown;
 }
 
+body {
+  font-family: sans-serif;
+}
+
+.state {
+  font-weight: bold;
+}
+
 /* TestRunnerPanel */
  .interrupted .interrupt {
   color:red;
