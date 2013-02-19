@@ -114,7 +114,6 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
       }
 
       function onLoad() {
-        setDebugFlags();
         startResponder();
       }
       window.addEventListener('load', onLoad);
