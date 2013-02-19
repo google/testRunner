@@ -36,19 +36,26 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
         var loaded = [];
         function appendScriptTags() {
             window.removeEventListener('load', appendScriptTags);
-            scripts.forEach(function(src) {
-                var script = document.createElement('script');
-                script.src = src;
-                script.onload = function() {
-                    loaded.push(script.src);
-                    if (loaded.length === scripts.length) {
-                       console.log(loaded.length + " scripts loaded and ready", loaded);
-                       setDebugFlags(); 
-                    }
-                };
-                document.getElementsByTagName('head')[0].appendChild(script);    
-            });
-            
+
+            var notLoaded = scripts.slice(0);
+            var loadOne = function(src) {
+              var script = document.createElement('script');
+              script.src = src;
+              script.onload = function() {
+                loaded.push(script.src);
+                if (loaded.length === scripts.length) {
+                 console.log(loaded.length + " scripts loaded and ready", loaded);
+                 setDebugFlags(); 
+                } else {
+                  loadNext();
+                }
+              };
+              document.getElementsByTagName('head')[0].appendChild(script);    
+            }
+            var loadNext = function() {
+              loadOne(notLoaded.shift());
+            }
+            loadNext();
         }
 
         function onLoad() {
