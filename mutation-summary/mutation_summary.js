@@ -13,7 +13,7 @@
 // limitations under the License.
 
 (function(global) {
-//  "use strict";
+  "use strict";
 
   var matchesSelector = 'matchesSelector';
   if ('webkitMatchesSelector' in Element.prototype)
@@ -1617,7 +1617,8 @@
       if (changesToReport(summaries))
         callback(summaries);
 
-      if (!options.observeOwnChanges) {
+      // disconnect() may have been called during the callback.
+      if (!options.observeOwnChanges && connected) {
         checkpointQueryValidators();
         observer.observe(root, observerOptions);
       }
