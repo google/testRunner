@@ -11,18 +11,17 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
     var matchDevtoolsURL = (path.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1);
     var matchTestParentURL = (window.location.host.indexOf(testParentURL) !== -1);       
     
-    console.log("injectedForExtensionTest testParentURL " + testParentURL + ' vs ' +path);
-    
     if (!matchDevtoolsURL && !matchTestParentURL)
-        return; 
+        return;
 
-    var debugFlags = selectedForDebug ? JSON.parse(selectedForDebug) : [];
-    console.log('injectedForExtensionTest debugFlags ', debugFlags);
+    window.DebugLogger = !!selectedForDebug;
+    var debugFlags = window.DebugLogger ? JSON.parse(selectedForDebug) : [];
+    
+    var debug = debugFlags.indexOf('injectedForExtensionTest') !== -1;
 
-    function setDebugFlags() {
-      debugFlags.forEach(function(name){
-        DebugLogger.set(name, true);  
-      });
+    if (debug) {
+      console.log("injectedForExtensionTest testParentURL " + testParentURL + ' vs ' +path);
+      console.log('injectedForExtensionTest debugFlags ' + debug, debugFlags);
     }
 
     (function(){
@@ -44,8 +43,16 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
               script.onload = function() {
                 loaded.push(script.src);
                 if (loaded.length === scripts.length) {
-                 console.log(loaded.length + " scripts loaded and ready", loaded);
-                 setDebugFlags(); 
+                  if (debug) {
+                    console.log(loaded.length + " scripts loaded and ready", loaded);
+                    DebugLogger.register('injectedForExtensionTest', function(flag){
+                      return debug = (typeof flag === 'boolean') ? flag : debug;
+                    });
+
+                    debugFlags.forEach(function(name){
+                      DebugLogger.set(name, true);  
+                    });
+                  }
                 } else {
                   loadNext();
                 }
@@ -79,12 +86,12 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
         var testCaseServer;
         ChannelPlate.Listener(testURL, function(rawPort, iframeURL){
             testCaseServer = new RemoteMethodCall.Responder(PatientSelector, rawPort);
-            console.log('injectedForExtensionTest startTestCaseServer in ' + window.location.href + ' for iframe ' + iframeURL);
+            if (debug) console.log('injectedForExtensionTest startTestCaseServer in ' + window.location.href + ' for iframe ' + iframeURL);
         });
         // Add frame for test case
         var testCaseIFrame = createTestCaseIframe();
         testCaseIFrame.src = testURL;
-        console.log("injectedForExtensionTest startTestCaseServer completed, appended iframe " + testURL);
+        if (debug) console.log("injectedForExtensionTest startTestCaseServer completed, appended iframe " + testURL);
       }
 
       function startProxyServers(event) {
@@ -94,19 +101,19 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
           if (info.startPage.indexOf(testParentURL) !== -1) {
             ChannelPlate.Listener(info.startPage, function(rawPort, iframeURL){
               PatientSelector.createProxy(rawPort, iframeURL);
-              console.log('injectedForExtensionTest.startProxyServers in ' + window.location.href + ' for extension iframe ' + iframeURL);
+              if (debug) console.log('injectedForExtensionTest.startProxyServers in ' + window.location.href + ' for extension iframe ' + iframeURL);
               if (!started) {
                 startTestCaseServer();
                 started = true;  
               }
             });
-            console.log('injectedForExtensionTest.startProxyServers listening for ' + info.startPage);  
+            if (debug) console.log('injectedForExtensionTest.startProxyServers listening for ' + info.startPage);  
           }
         });
       }
       
       window.addEventListener('extensionsRegistering', startProxyServers);
-      console.log("injectedForExtensionTest found devtoolsURL, waiting for extensionsRegistering " + window.location.href);
+      if (debug) console.log("injectedForExtensionTest found devtoolsURL, waiting for extensionsRegistering " + window.location.href);
 
     } else if (matchTestParentURL) {
         // then we are in one of the devtools extension iframes
@@ -117,7 +124,7 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
         window._testRunnerService.channelPlate = new ChannelPlate.ChildIframe(window._testRunnerService.responder.onMessage);
         window._testRunnerService.responder.accept(window._testRunnerService.channelPlate.port);
         window.removeEventListener('load', startResponder);
-        console.log("injectedForExtensionTest.startListener in extension URL " + window.location.href);
+        if (debug) console.log("injectedForExtensionTest.startListener in extension URL " + window.location.href);
       }
 
       function onLoad() {
