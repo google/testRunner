@@ -51,9 +51,9 @@ var TestRunnerPanel = {
    
     initialize: function() {
         this.attachListeners();
-        this.restore();
         this.availableFlags = ko.observableArray([]);
         this.selectedFlags = ko.observableArray([]);
+        this.restore();
         ko.applyBindings(TestRunnerPanel);
     },
 
