@@ -10,19 +10,24 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
     var path = window.location.href;
     var matchDevtoolsURL = (path.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1);
     var matchTestParentURL = (window.location.host.indexOf(testParentURL) !== -1);       
-    
-    if (!matchDevtoolsURL && !matchTestParentURL)
+    var matchTestURL = testURL === path;
+
+    if (!matchDevtoolsURL && !matchTestParentURL && !matchTestURL)
         return;
 
-    window.DebugLogger = !!selectedForDebug;
-    var debugFlags = window.DebugLogger ? JSON.parse(selectedForDebug) : [];
+    var debugFlags = window.DebugLogger = selectedForDebug ? JSON.parse(selectedForDebug) : [];
     
     var debug = debugFlags.indexOf('injectedForExtensionTest') !== -1;
 
     if (debug) {
+      console.log("injectedForExtensionTest "+ matchTestParentURL + " testParentURL " + testParentURL + ' vs ' +path);
+      console.log("injectedForExtensionTest "+ matchTestURL + " testURL " + testURL + ' vs ' +path);
       console.log("injectedForExtensionTest testParentURL " + testParentURL + ' vs ' +path);
       console.log('injectedForExtensionTest debugFlags ' + debug, debugFlags);
     }
+
+    if (matchTestURL)
+      return;
 
     (function(){
         var scripts = [
@@ -47,11 +52,8 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
                       return debug = (typeof flag === 'boolean') ? flag : debug;
                     });
                   if (debug) {
-                    console.log(loaded.length + " scripts loaded and ready", loaded);
+                    console.log("injectedForExtensionTest: " + loaded.length + " scripts loaded and ready", loaded);
                   }
-                  debugFlags.forEach(function(name){
-                    DebugLogger.set(name, true);  
-                  });
                 } else {
                   loadNext();
                 }
