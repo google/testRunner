@@ -43,16 +43,15 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
               script.onload = function() {
                 loaded.push(script.src);
                 if (loaded.length === scripts.length) {
-                  if (debug) {
-                    console.log(loaded.length + " scripts loaded and ready", loaded);
                     DebugLogger.register('injectedForExtensionTest', function(flag){
                       return debug = (typeof flag === 'boolean') ? flag : debug;
                     });
-
-                    debugFlags.forEach(function(name){
-                      DebugLogger.set(name, true);  
-                    });
+                  if (debug) {
+                    console.log(loaded.length + " scripts loaded and ready", loaded);
                   }
+                  debugFlags.forEach(function(name){
+                    DebugLogger.set(name, true);  
+                  });
                 } else {
                   loadNext();
                 }
