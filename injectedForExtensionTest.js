@@ -34,6 +34,7 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
             "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/ChannelPlate/ChannelPlate.js",
             "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/ChannelPlate/RemoteMethodCall.js",
             "chrome-extension://mpbflbdfncldfbjicfcfbaikknnbfmae/DebugLogger.js",
+            "chrome-extension://mpbflbdfncldfbjicfcfbaikknnbfmae/keymaster/keymaster.js",
             "chrome-extension://mpbflbdfncldfbjicfcfbaikknnbfmae/test/LayoutTests/PatientSelector.js",
             "chrome-extension://klmlfkibgfifmkanocmdenpieghpgifl/mutation-summary/mutation_summary.js"
         ];
