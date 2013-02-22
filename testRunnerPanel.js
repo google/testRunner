@@ -474,7 +474,7 @@ TestRunner.prototype = {
         argsAsString += this._testModel.testParentURL +'\", \'';
         argsAsString += JSON.stringify(SignalTokens) + '\'';
         if (debug) {
-           argsAsString += ', \'' + JSON.stringify(TestRunnerPanel.selectedForDebug()) + '\'';
+           argsAsString += ', \'' + JSON.stringify(TestRunnerPanel.selectedForDebug().concat(['DebugLogger'])) + '\'';
         }
         var reloadOptions = {
             ignoreCache: true, 
