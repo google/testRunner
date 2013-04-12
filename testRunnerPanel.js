@@ -43,7 +43,7 @@ var SignalTokens = {
     PATIENT_SELECTOR: "PatientSelectorAPI",
     DEVTOOLS_WINDOW: "DevtoolsWindowTestAPI",
     EXTENSION_WINDOW: "ExtensionWindowTestAPI",
-    DEVTOOLS_PATH: 'inspector/front-end/devtools.html'
+    DEVTOOLS_PATH: 'devtools/front_end/devtools.html'
 };
 
 var TestRunnerPanel = { 

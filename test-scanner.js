@@ -95,9 +95,6 @@ function fetchExpectations(path, testParentURL, extension)
     var testCaseURL = path;
     var ext = path.lastIndexOf(".");
     path = path.substring(0, ext) + "-expected.txt";
-    
-    var chromiumSegment = "/LayoutTests/platform/chromium/";
-    var chromiumPath = path.replace("/LayoutTests/", chromiumSegment);
 
     function filter(expectations) {
         unfetchedByURL[testCaseURL] = false;
@@ -123,17 +120,10 @@ function fetchExpectations(path, testParentURL, extension)
     }
     
     unfetchedByURL[testCaseURL] = true;
-
-    xhrGET(chromiumPath, filter, function(msg) {
-        if (msg === 404) {
-                // If we don't find the expectations under chromium, try webkit proper
-                xhrGET(path, filter, function(msg) {
-                  console.warn("Failed to find expected results for test case "+path, msg);
-                });     
-        } else {
-            // normal console.warn("Failed to load "+ url +" for chromiumPath "+chromiumPath, msg);
-        }
-    });
+    
+    xhrGET(path, filter, function(msg) {
+        console.warn("Failed to find expected results for test case "+path, msg);
+    });    
 }
 
 
