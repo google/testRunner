@@ -40,7 +40,7 @@ var LayoutTests = [
         extension: true,
         testParentURL: 'mpbflbdfncldfbjicfcfbaikknnbfmae',
         baseURL: "http://localhost:8686/test",
-        folders: ["/LayoutTests/Panel", "/LayoutTests/DocGen"]
+        folders: ["/LayoutTests/Panel", "/LayoutTests/DocGen", "/LayoutTests/DevtoolsPage"]
     },
 ];
 
@@ -87,7 +87,7 @@ if (DEBUG) {
         console.log(Object.keys(unfetchedByURL).forEach(function(url){
             console.log('Unfetched[' + url + ']=' + unfetchedByURL[url]);
         }))
-    }, 5000);    
+    }, 5000);
 }
 
 function fetchExpectations(path, testParentURL, extension)
@@ -98,7 +98,7 @@ function fetchExpectations(path, testParentURL, extension)
 
     function filter(expectations) {
         unfetchedByURL[testCaseURL] = false;
-                  
+
         var expectationLines = expectations.split("\n");
         var filtered = [];
         for (var i = 0; i < expectationLines.length; ++i) {
@@ -110,20 +110,20 @@ function fetchExpectations(path, testParentURL, extension)
             filtered.push(expectationLines[i]);
         }
         var testExpectations = {
-            testCaseURL: testCaseURL, 
-            expectedURL: path, 
+            testCaseURL: testCaseURL,
+            expectedURL: path,
             expected: filtered.join("\n"),
             testParentURL: testParentURL,
             extension: extension
         };
         window.parent.postMessage(["test", testExpectations], "*");
     }
-    
+
     unfetchedByURL[testCaseURL] = true;
-    
+
     xhrGET(path, filter, function(msg) {
         console.warn("Failed to find expected results for test case "+path, msg);
-    });    
+    });
 }
 
 
