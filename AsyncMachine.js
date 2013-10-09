@@ -8,6 +8,7 @@
   var AsyncMachine = {
     ops: [],
     pushOp: function(fnc, opt_args) {
+      console.assert(fnc);
       var args = Array.prototype.slice.apply(arguments);
       args.shift();
       var resultProcessor;

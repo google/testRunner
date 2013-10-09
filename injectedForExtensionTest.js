@@ -2,21 +2,21 @@
 // Copyright 2013 Google Inc. johnjbarton@google.com
 
 // This function is serialized and runs in every iframe when testing extensions
-// only. We test the window.location to add API only to the window being tested 
+// only. We test the window.location to add API only to the window being tested
 // and to the main WebInspetor window.
 function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, selectedForDebug) {
     var SignalTokens = JSON.parse(jsonSignalTokens);
-    
+
     var path = window.location.href;
     var matchDevtoolsURL = (path.indexOf(SignalTokens.DEVTOOLS_PATH) !== -1);
-    var matchTestParentURL = (window.location.host.indexOf(testParentURL) !== -1);       
+    var matchTestParentURL = (window.location.host.indexOf(testParentURL) !== -1);
     var matchTestURL = testURL === path;
 
     if (!matchDevtoolsURL && !matchTestParentURL && !matchTestURL)
         return;
 
     var debugFlags = window.DebugLogger = selectedForDebug ? JSON.parse(selectedForDebug) : [];
-    
+
     var debug = debugFlags.indexOf('injectedForExtensionTest') !== -1;
 
     if (debug) {
@@ -59,7 +59,7 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
                   loadNext();
                 }
               };
-              document.getElementsByTagName('head')[0].appendChild(script);    
+              document.getElementsByTagName('head')[0].appendChild(script);
             }
             var loadNext = function() {
               loadOne(notLoaded.shift());
@@ -74,7 +74,7 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
         // We cannot inject during reload-injection, crashes extension.
         window.addEventListener('DOMContentLoaded', onLoad);
     }());
-    
+
     if (matchDevtoolsURL) {
 
       function createTestCaseIframe() {
@@ -106,14 +106,14 @@ function injectedForExtensionTest(testURL, testParentURL, jsonSignalTokens, sele
               if (debug) console.log('injectedForExtensionTest.startProxyServers in ' + window.location.href + ' for extension iframe ' + iframeURL);
               if (!started) {
                 startTestCaseServer();
-                started = true;  
+                started = true;
               }
             });
-            if (debug) console.log('injectedForExtensionTest.startProxyServers listening for ' + info.startPage);  
+            if (debug) console.log('injectedForExtensionTest.startProxyServers listening for ' + info.startPage);
           }
         });
       }
-      
+
       window.addEventListener('extensionsRegistering', startProxyServers);
       if (debug) console.log("injectedForExtensionTest found devtoolsURL, waiting for extensionsRegistering " + window.location.href);
 
