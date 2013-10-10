@@ -8,3 +8,12 @@ chrome.devtools.panels.create("testRunner", "testRunnerIcon.png", "testRunnerPan
   });
 });
 
+chrome.devtools.panels.sources.createSidebarPane("testRunner", function(extensionPane) {
+  console.log("testRunner sidebar created ", extensionPane);
+  extensionPane.setPage("testRunnerPanel.html");
+  //extensionPane.setHeight("26px");
+  extensionPane.onShown.addListener(function(win) {
+    console.log("extensionPane onShown, win: ", win);
+    runtimeStatus.extensionPaneWindow = win;
+  });
+});
